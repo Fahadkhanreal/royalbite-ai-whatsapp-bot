@@ -31,7 +31,12 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- Accuracy: Answers and business data MUST come from approved RAG/admin records; missing data MUST use safe fallback.
+- Experience: Customer-facing flows MUST preserve RoyalBite's Roman Urdu + English waiter tone.
+- Order Integrity: Order flows MUST confirm items, customer details, totals, and final approval before persistence.
+- Privacy/Security: Customer data and secrets MUST be protected; admin actions MUST be authenticated and authorized.
+- Admin Knowledge: Customer-answering data MUST have an admin-owned update and ingestion/sync path.
+- Reliability/Voice: Plans MUST define latency targets, provider failure fallbacks, and text fallback for voice failures.
 
 ## Project Structure
 

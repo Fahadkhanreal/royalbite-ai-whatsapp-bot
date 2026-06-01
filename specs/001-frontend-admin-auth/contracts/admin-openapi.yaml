@@ -1,0 +1,168 @@
+openapi: 3.1.0
+info:
+  title: RoyalBite Frontend Admin Contracts
+  version: 1.0.0
+servers:
+  - url: /api
+paths:
+  /admin/dashboard:
+    get:
+      summary: Get admin dashboard summary
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Dashboard summary }
+        '401': { description: Not authenticated }
+        '403': { description: Not an admin }
+  /admin/menu:
+    get:
+      summary: List admin menu items
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Menu items }
+        '401': { description: Not authenticated }
+        '403': { description: Not an admin }
+    post:
+      summary: Create menu item
+      security: [{ adminSession: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MenuItemInput' }
+      responses:
+        '201': { description: Created menu item }
+        '400': { description: Validation error }
+        '401': { description: Not authenticated }
+        '403': { description: Not an admin }
+  /admin/menu/{id}:
+    patch:
+      summary: Update menu item
+      security: [{ adminSession: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/MenuItemInput' }
+      responses:
+        '200': { description: Updated menu item }
+        '400': { description: Validation error }
+        '401': { description: Not authenticated }
+        '403': { description: Not an admin }
+        '404': { description: Not found }
+    delete:
+      summary: Delete menu item
+      security: [{ adminSession: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '204': { description: Deleted }
+        '401': { description: Not authenticated }
+        '403': { description: Not an admin }
+        '404': { description: Not found }
+  /public/menu:
+    get:
+      summary: Get public read-only menu
+      responses:
+        '200': { description: Public menu items }
+  /admin/timings:
+    get:
+      summary: List business timings
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Business timings }
+    put:
+      summary: Replace weekly business timings
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Updated timings }
+        '400': { description: Validation error }
+  /admin/knowledge:
+    get:
+      summary: List knowledge entries
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Knowledge entries }
+    post:
+      summary: Create knowledge entry
+      security: [{ adminSession: [] }]
+      responses:
+        '201': { description: Created knowledge entry }
+        '400': { description: Validation error }
+  /admin/documents:
+    get:
+      summary: List RAG documents
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Documents and ingestion status }
+    post:
+      summary: Upload RAG document metadata/content for ingestion
+      security: [{ adminSession: [] }]
+      responses:
+        '202': { description: Accepted for processing }
+        '400': { description: Unsupported or invalid file }
+  /admin/documents/{id}/reindex:
+    post:
+      summary: Re-index a document
+      security: [{ adminSession: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '202': { description: Re-index accepted }
+        '404': { description: Not found }
+  /admin/orders:
+    get:
+      summary: List orders with optional filters
+      security: [{ adminSession: [] }]
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string } }
+        - { name: search, in: query, required: false, schema: { type: string } }
+      responses:
+        '200': { description: Orders }
+  /admin/orders/{id}/status:
+    patch:
+      summary: Update order status
+      security: [{ adminSession: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [pending, confirmed, preparing, ready, delivered, cancelled]
+      responses:
+        '200': { description: Updated order status }
+        '400': { description: Invalid transition }
+        '404': { description: Not found }
+  /admin/settings:
+    get:
+      summary: Get restaurant settings
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Settings }
+    put:
+      summary: Update restaurant settings
+      security: [{ adminSession: [] }]
+      responses:
+        '200': { description: Updated settings }
+        '400': { description: Validation error }
+components:
+  securitySchemes:
+    adminSession:
+      type: apiKey
+      in: cookie
+      name: auth-session
+  schemas:
+    MenuItemInput:
+      type: object
+      required: [name, price, category]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        price: { type: number, minimum: 0 }
+        category: { type: string }
+        availability: { type: string, enum: [available, unavailable, draft] }
+        imageUrl: { type: string }
