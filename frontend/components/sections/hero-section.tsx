@@ -63,7 +63,7 @@ export function HeroSection() {
       >
         {/* Top Badge */}
         <motion.div
-          className="mb-8 flex justify-center"
+          className="mb-4 flex justify-center"
           variants={itemVariants}
         >
           <div className="inline-flex items-center gap-3 px-5 py-3 rounded-full backdrop-blur-sm" style={{ border: "1.5px solid #C9A227", background: "rgba(201, 162, 39, 0.08)" }}>
@@ -75,7 +75,7 @@ export function HeroSection() {
 
         {/* R Logo */}
         <motion.div
-          className="mb-10 flex justify-center"
+          className="mb-6 flex justify-center"
           variants={itemVariants}
         >
           <motion.div
@@ -97,7 +97,7 @@ export function HeroSection() {
 
         {/* RoyalBite */}
         <motion.h1
-          className="text-7xl sm:text-8xl lg:text-9xl font-playfair font-bold mb-8 tracking-tighter leading-tight"
+          className="text-7xl sm:text-8xl lg:text-9xl font-playfair font-bold mb-4 tracking-tighter leading-tight"
           variants={itemVariants}
           style={{ color: "#F8F5F0" }}
         >
@@ -106,7 +106,7 @@ export function HeroSection() {
 
         {/* Tagline */}
         <motion.p
-          className="text-2xl sm:text-3xl font-playfair mb-10 tracking-wide font-semibold"
+          className="text-2xl sm:text-3xl font-playfair mb-6 tracking-wide font-semibold"
           variants={itemVariants}
           style={{ color: "#C9A227" }}
         >
@@ -115,7 +115,7 @@ export function HeroSection() {
 
         {/* Description */}
         <motion.div
-          className="max-w-3xl mx-auto mb-12"
+          className="max-w-3xl mx-auto mb-8"
           variants={itemVariants}
         >
           <p className="text-lg sm:text-xl leading-relaxed mb-4" style={{ color: "#A8B0B9" }}>
@@ -125,7 +125,7 @@ export function HeroSection() {
 
         {/* Divider */}
         <motion.div
-          className="flex justify-center items-center gap-4 mb-14"
+          className="flex justify-center items-center gap-4 mb-10"
           variants={itemVariants}
         >
           <div className="h-px w-16" style={{ background: "linear-gradient(to right, transparent, #C9A227)" }}></div>
@@ -221,7 +221,7 @@ export function HeroSection() {
 
         {/* Features */}
         <motion.div
-          className="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-16 max-w-3xl mx-auto"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-8 mt-10 max-w-3xl mx-auto"
           variants={itemVariants}
         >
           <motion.div
