@@ -91,14 +91,14 @@ export function FeaturedDishes() {
                     <span className="text-xl font-bold" style={{ color: "#C9A227" }}>
                       {dish.price}
                     </span>
-                    <Button
-                      asChild
-                      className="btn-gold"
+                    <a
+                      href={`https://wa.me/923001234567?text=I%20want%20to%20order%20${dish.name}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-gold text-sm px-6 py-2 rounded"
                     >
-                      <a href={`https://wa.me/923001234567?text=I%20want%20to%20order%20${dish.name}`} target="_blank" rel="noopener noreferrer">
-                        Order
-                      </a>
-                    </Button>
+                      Order
+                    </a>
                   </div>
                 </div>
               </Card>
@@ -114,12 +114,9 @@ export function FeaturedDishes() {
           transition={{ duration: 0.8 }}
           viewport={{ once: true }}
         >
-          <Button
-            asChild
-            className="btn-outline-gold text-lg px-10 py-3"
-          >
-            <a href="#menu">View Full Menu</a>
-          </Button>
+          <a href="#menu" className="btn-outline-gold text-lg px-10 py-3 inline-block rounded">
+            View Full Menu
+          </a>
         </motion.div>
       </div>
     </section>

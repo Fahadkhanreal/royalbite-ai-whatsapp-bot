@@ -4,7 +4,6 @@ import { motion } from "framer-motion"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { Button } from "@/components/ui/button"
 import {
   Form,
   FormControl,
@@ -206,9 +205,9 @@ export function Reservation() {
 
               {/* Submit */}
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                <Button type="submit" className="w-full btn-gold text-lg py-3">
+                <button type="submit" className="w-full btn-gold text-lg py-3 rounded">
                   Reserve Now
-                </Button>
+                </button>
               </motion.div>
             </form>
           </Form>

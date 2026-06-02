@@ -86,12 +86,9 @@ export function MenuPreview() {
                   {category.description}
                 </p>
 
-                <Button
-                  asChild
-                  className="btn-gold w-full"
-                >
-                  <a href="#menu">Explore</a>
-                </Button>
+                <a href="#menu" className="btn-gold w-full block text-center py-2 rounded">
+                  Explore
+                </a>
               </Card>
             </motion.div>
           ))}
@@ -105,14 +102,9 @@ export function MenuPreview() {
           transition={{ duration: 0.8 }}
           viewport={{ once: true }}
         >
-          <Button
-            asChild
-            className="btn-outline-gold text-lg px-10 py-3"
-          >
-            <a href="https://wa.me/923001234567?text=Send%20me%20the%20full%20menu">
-              Get Full Menu
-            </a>
-          </Button>
+          <a href="https://wa.me/923001234567?text=Send%20me%20the%20full%20menu" className="btn-outline-gold text-lg px-10 py-3 inline-block rounded">
+            Get Full Menu
+          </a>
         </motion.div>
       </div>
     </section>
