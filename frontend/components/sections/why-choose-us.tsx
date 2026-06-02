@@ -28,74 +28,60 @@ const FEATURES = [
 ]
 
 export function WhyChooseUs() {
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.2,
-      },
-    },
-  }
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.6 },
-    },
-  }
-
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-royal-dark">
+    <section className="py-20 px-4 sm:px-6 lg:px-8" style={{ background: "linear-gradient(to bottom, rgba(13, 17, 23, 0.95), #0D1117)" }}>
       <div className="max-w-7xl mx-auto">
-        {/* Section Header */}
+        {/* Header */}
         <motion.div
           className="text-center mb-16"
-          initial={{ opacity: 0, y: -20 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
+          transition={{ duration: 0.8 }}
           viewport={{ once: true }}
         >
-          <h2 className="text-4xl sm:text-5xl font-playfair font-bold text-royal-light mb-4">
-            Why Choose Us
+          <h2 className="text-4xl sm:text-5xl font-playfair font-bold mb-4" style={{ color: "#F8F5F0" }}>
+            Why Choose RoyalBite
           </h2>
-          <p className="text-royal-orange text-lg">
-            Excellence in every aspect of our service
+          <p style={{ color: "#A8B0B9" }} className="text-lg">
+            Experience excellence in every aspect
           </p>
         </motion.div>
 
         {/* Features Grid */}
-        <motion.div
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8"
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-        >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {FEATURES.map((feature, index) => {
             const Icon = feature.icon
             return (
-              <motion.div key={index} variants={itemVariants}>
-                <Card className="bg-slate-800/50 border-royal-red/20 p-8 text-center hover-lift group">
-                  <div className="flex justify-center mb-6">
-                    <div className="w-16 h-16 bg-gradient-to-br from-royal-red to-royal-orange rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
-                      <Icon className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                  <h3 className="text-xl font-playfair font-bold text-royal-light mb-3">
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: index * 0.1 }}
+                viewport={{ once: true }}
+              >
+                <Card
+                  className="p-6 backdrop-blur-sm"
+                  style={{
+                    background: "rgba(22, 27, 34, 0.5)",
+                    border: "1px solid rgba(201, 162, 39, 0.2)"
+                  }}
+                >
+                  <motion.div whileHover={{ scale: 1.1 }} className="mb-4">
+                    <Icon className="w-12 h-12" style={{ color: "#C9A227" }} />
+                  </motion.div>
+
+                  <h3 className="text-xl font-playfair font-bold mb-3" style={{ color: "#F8F5F0" }}>
                     {feature.title}
                   </h3>
-                  <p className="text-royal-light/70">
+
+                  <p style={{ color: "#A8B0B9" }} className="text-sm leading-relaxed">
                     {feature.description}
                   </p>
                 </Card>
               </motion.div>
             )
           })}
-        </motion.div>
+        </div>
       </div>
     </section>
   )
