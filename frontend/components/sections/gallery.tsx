@@ -37,9 +37,9 @@ export function Gallery() {
   }
 
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-royal-dark">
+    <section id="gallery" className="py-20 px-4 sm:px-6 lg:px-8" style={{ background: "linear-gradient(to bottom, #0D1117, rgba(13, 17, 23, 0.95))" }}>
       <div className="max-w-7xl mx-auto">
-        {/* Section Header */}
+        {/* Header */}
         <motion.div
           className="text-center mb-16"
           initial={{ opacity: 0, y: -20 }}
@@ -47,10 +47,10 @@ export function Gallery() {
           transition={{ duration: 0.6 }}
           viewport={{ once: true }}
         >
-          <h2 className="text-4xl sm:text-5xl font-playfair font-bold text-royal-light mb-4">
+          <h2 className="text-4xl sm:text-5xl font-playfair font-bold mb-4" style={{ color: "#F8F5F0" }}>
             Gallery
           </h2>
-          <p className="text-royal-orange text-lg">
+          <p style={{ color: "#A8B0B9" }} className="text-lg">
             Visual journey through our culinary creations
           </p>
         </motion.div>
@@ -63,24 +63,31 @@ export function Gallery() {
           whileInView="visible"
           viewport={{ once: true }}
         >
-          {GALLERY_IMAGES.map((image, index) => (
+          {GALLERY_IMAGES.map((image) => (
             <motion.div
               key={image.id}
+              className="relative overflow-hidden rounded-lg group cursor-pointer"
               variants={itemVariants}
-              className={`relative overflow-hidden rounded-lg group cursor-pointer ${
-                index === 0 || index === 4 ? "md:col-span-1 md:row-span-2" : ""
-              }`}
               style={{
-                height: index === 0 || index === 4 ? "400px" : "250px",
+                border: "1px solid rgba(201, 162, 39, 0.2)",
+                background: "rgba(22, 27, 34, 0.3)"
               }}
+              whileHover={{ scale: 1.05 }}
             >
-              <Image
-                src={image.src}
-                alt={image.alt}
-                fill
-                className="object-cover group-hover:scale-110 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors duration-300" />
+              <div className="relative h-64 md:h-80">
+                <Image
+                  src={image.src}
+                  alt={image.alt}
+                  fill
+                  unoptimized
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-6">
+                  <p style={{ color: "#F8F5F0" }} className="font-playfair text-lg font-semibold">
+                    {image.alt}
+                  </p>
+                </div>
+              </div>
             </motion.div>
           ))}
         </motion.div>
