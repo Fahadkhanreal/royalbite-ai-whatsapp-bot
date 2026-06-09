@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0A0A0A"/>
+      <stop offset="100%" style="stop-color:#1A1512"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:transparent"/>
+      <stop offset="50%" style="stop-color:#C9A227"/>
+      <stop offset="100%" style="stop-color:transparent"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+
+  <!-- Top accent -->
+  <rect x="0" y="0" width="1200" height="4" fill="url(#gold)"/>
+
+  <!-- Corner decorations -->
+  <rect x="40" y="40" width="60" height="60" fill="none" stroke="#C9A227" stroke-width="3"/>
+  <line x1="40" y1="40" x2="100" y2="40" stroke="#C9A227" stroke-width="3"/>
+  <line x1="40" y1="40" x2="40" y2="100" stroke="#C9A227" stroke-width="3"/>
+
+  <rect x="1100" y="40" width="60" height="60" fill="none" stroke="#C9A227" stroke-width="3"/>
+  <line x1="1100" y1="40" x2="1160" y2="40" stroke="#C9A227" stroke-width="3"/>
+  <line x1="1160" y1="40" x2="1160" y2="100" stroke="#C9A227" stroke-width="3"/>
+
+  <rect x="40" y="530" width="60" height="60" fill="none" stroke="#C9A227" stroke-width="3"/>
+  <line x1="40" y1="530" x2="100" y2="530" stroke="#C9A227" stroke-width="3"/>
+  <line x1="40" y1="530" x2="40" y2="590" stroke="#C9A227" stroke-width="3"/>
+
+  <rect x="1100" y="530" width="60" height="60" fill="none" stroke="#C9A227" stroke-width="3"/>
+  <line x1="1100" y1="530" x2="1160" y2="530" stroke="#C9A227" stroke-width="3"/>
+  <line x1="1160" y1="530" x2="1160" y2="590" stroke="#C9A227" stroke-width="3"/>
+
+  <!-- Crown -->
+  <text x="600" y="220" font-size="72" text-anchor="middle">👑</text>
+
+  <!-- Name -->
+  <text x="600" y="310" font-family="Georgia, serif" font-size="72" font-weight="bold" fill="#F8F5F0" text-anchor="middle" letter-spacing="4">RoyalBite</text>
+
+  <!-- Tagline -->
+  <text x="600" y="370" font-family="Georgia, serif" font-size="32" fill="#C9A227" text-anchor="middle" letter-spacing="6" text-transform="uppercase">Premium Pakistani Restaurant</text>
+
+  <!-- Gold divider -->
+  <line x1="500" y1="400" x2="700" y2="400" stroke="url(#gold)" stroke-width="2"/>
+
+  <!-- Features -->
+  <text x="380" y="460" font-family="Arial, sans-serif" font-size="20" fill="#A8B0B9" text-anchor="middle">🍽️ Authentic Cuisine</text>
+  <text x="600" y="460" font-family="Arial, sans-serif" font-size="20" fill="#A8B0B9" text-anchor="middle">📱 WhatsApp Ordering</text>
+  <text x="820" y="460" font-family="Arial, sans-serif" font-size="20" fill="#A8B0B9" text-anchor="middle">📍 Karachi</text>
+
+  <!-- Bottom glow -->
+  <rect x="300" y="628" width="600" height="2" fill="rgba(201,162,39,0.4)"/>
+</svg>

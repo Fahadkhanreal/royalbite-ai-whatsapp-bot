@@ -10,8 +10,8 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h1>
-        {description ? <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{description}</p> : null}
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl" style={{ color: "#F8F5F0" }}>{title}</h1>
+        {description ? <p className="mt-2 max-w-2xl text-sm" style={{ color: "#A8B0B9" }}>{description}</p> : null}
       </div>
       {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
     </div>

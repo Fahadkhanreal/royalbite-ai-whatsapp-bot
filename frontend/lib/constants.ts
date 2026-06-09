@@ -1,10 +1,10 @@
 export const APP_NAME = "RoyalBite AI"
 
 export const ROYALBITE_COLORS = {
-  primary: "#E11D48",
-  secondary: "#F97316",
+  primary: "#C9A227",     // Gold (brand)
+  secondary: "#B8860B",   // Dark Goldenrod
   darkBackground: "#0A0A0A",
-  gold: "#F59E0B",
+  gold: "#C9A227",
 } as const
 
 export const ADMIN_NAV_ITEMS = [
@@ -24,7 +24,7 @@ export const PUBLIC_NAV_ITEMS = [
   { title: "About", href: "/about" },
 ] as const
 
-export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "923001234567"
+export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "+923482240731"
 
 export const DISHES = [
   {

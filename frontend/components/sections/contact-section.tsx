@@ -29,7 +29,7 @@ export function ContactSection() {
   ]
 
   return (
-    <section id="contact" className="py-20 px-4 sm:px-6 lg:px-8" style={{ background: "linear-gradient(to bottom, rgba(13, 17, 23, 0.95), #0D1117)" }}>
+    <section id="contact" className="py-20 px-4 sm:px-6 lg:px-8 scroll-mt-24" style={{ background: "linear-gradient(to bottom, rgba(10, 10, 10, 0.95), #0A0A0A)" }}>
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
@@ -62,7 +62,7 @@ export function ContactSection() {
                 <Card
                   className="p-6 backdrop-blur-sm text-center"
                   style={{
-                    background: "rgba(22, 27, 34, 0.5)",
+                    background: "rgba(20, 15, 12, 0.6)",
                     border: "1px solid rgba(201, 162, 39, 0.2)"
                   }}
                 >
@@ -88,7 +88,7 @@ export function ContactSection() {
           className="relative overflow-hidden rounded-lg"
           style={{
             border: "2px solid rgba(201, 162, 39, 0.3)",
-            background: "rgba(22, 27, 34, 0.3)",
+            background: "rgba(20, 15, 12, 0.4)",
             height: "400px"
           }}
           initial={{ opacity: 0 }}

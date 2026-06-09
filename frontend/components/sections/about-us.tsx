@@ -5,7 +5,7 @@ import Image from "next/image"
 
 export function AboutUs() {
   return (
-    <section id="about" className="py-20 px-4 sm:px-6 lg:px-8" style={{ background: "linear-gradient(to bottom, #0D1117, rgba(13, 17, 23, 0.95))" }}>
+    <section id="about" className="py-20 px-4 sm:px-6 lg:px-8 scroll-mt-24" style={{ background: "linear-gradient(to bottom, #0A0A0A, rgba(13, 17, 23, 0.95))" }}>
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Content */}
@@ -78,21 +78,42 @@ export function AboutUs() {
 
           {/* Image */}
           <motion.div
-            className="relative h-96 rounded-lg overflow-hidden"
+            className="relative h-96 rounded-lg overflow-hidden group cursor-pointer"
             initial={{ opacity: 0, x: 20 }}
             whileInView={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true }}
             style={{ border: "2px solid rgba(201, 162, 39, 0.3)" }}
+            whileHover={{ borderColor: "#C9A227" }}
           >
-            <Image
-              src="/about-us.jpg"
-              alt="RoyalBite Restaurant"
-              fill
-              unoptimized
-              className="object-cover"
-            />
+            <motion.div
+              className="absolute inset-0"
+              whileHover={{ scale: 1.08 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+            >
+              <Image
+                src="/about-us.jpg"
+                alt="RoyalBite Restaurant"
+                fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
+                className="object-cover"
+              />
+            </motion.div>
             <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+
+            {/* Golden corner accents on hover */}
+            <div className="absolute top-0 left-0 w-12 h-12 border-t-2 border-l-2 border-transparent group-hover:border-[#C9A227] transition-all duration-500" />
+            <div className="absolute top-0 right-0 w-12 h-12 border-t-2 border-r-2 border-transparent group-hover:border-[#C9A227] transition-all duration-500 delay-75" />
+            <div className="absolute bottom-0 left-0 w-12 h-12 border-b-2 border-l-2 border-transparent group-hover:border-[#C9A227] transition-all duration-500 delay-100" />
+            <div className="absolute bottom-0 right-0 w-12 h-12 border-b-2 border-r-2 border-transparent group-hover:border-[#C9A227] transition-all duration-500 delay-150" />
+
+            {/* Shine effect on hover */}
+            <motion.div
+              className="absolute inset-0 opacity-0 group-hover:opacity-30 bg-gradient-to-r from-transparent via-white to-transparent"
+              initial={{ x: "-100%" }}
+              whileHover={{ x: "100%" }}
+              transition={{ duration: 0.8 }}
+            />
           </motion.div>
         </div>
       </div>

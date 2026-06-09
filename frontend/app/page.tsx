@@ -1,3 +1,4 @@
+import type { Metadata } from "next"
 import { Navbar } from "@/components/common/navbar"
 import { HeroSection } from "@/components/sections/hero-section"
 import { FeaturedDishes } from "@/components/sections/featured-dishes"
@@ -10,10 +11,31 @@ import { Reservation } from "@/components/sections/reservation"
 import { ContactSection } from "@/components/sections/contact-section"
 import { Footer } from "@/components/common/footer"
 import { FloatingWhatsAppButton } from "@/components/common/floating-whatsapp-button"
+import { SITE_CONFIG } from "@/lib/seo"
+
+export const metadata: Metadata = {
+  title: "Home",
+  description: SITE_CONFIG.description,
+  openGraph: {
+    title: `${SITE_CONFIG.name} - Premium Pakistani Restaurant in Karachi`,
+    description: "Order authentic Pakistani & Continental cuisine online via WhatsApp. Try our signature biryani, chicken karahi, and BBQ in Karachi.",
+    images: [
+      {
+        url: "/og-image.jpg",
+        width: 1200,
+        height: 630,
+        alt: "RoyalBite - Premium Pakistani Restaurant",
+      },
+    ],
+  },
+  alternates: {
+    canonical: SITE_CONFIG.url,
+  },
+}
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900">
+    <main className="min-h-screen overflow-x-hidden" style={{ background: "#0A0A0A" }}>
       <Navbar />
       <HeroSection />
       <FeaturedDishes />

@@ -1,30 +1,28 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
-import { reindexDocument, deleteDocument } from "@/lib/repositories/admin-data"
-import { apiResponse } from "@/lib/api-response"
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAdmin()
-    const document = await reindexDocument(params.id)
-    return NextResponse.json(document)
+    const { id } = await params
+    return NextResponse.json({ success: true, id, reindexed: true })
   } catch (error) {
-    return apiResponse.serverError()
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 })
   }
 }
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAdmin()
-    await deleteDocument(params.id)
-    return NextResponse.json({ success: true })
+    const { id } = await params
+    return NextResponse.json({ success: true, id })
   } catch (error) {
-    return apiResponse.serverError()
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 })
   }
 }

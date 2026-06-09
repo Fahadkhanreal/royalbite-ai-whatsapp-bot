@@ -3,6 +3,7 @@
 import { motion } from "framer-motion"
 import Link from "next/link"
 import { Send, Heart, MessageCircle } from "lucide-react"
+import { WHATSAPP_NUMBER } from "@/lib/constants"
 
 export function Footer() {
   const currentYear = new Date().getFullYear()
@@ -28,7 +29,7 @@ export function Footer() {
     },
     {
       icon: MessageCircle,
-      href: "https://wa.me/923001234567",
+      href: `https://wa.me/${WHATSAPP_NUMBER.replace('+', '')}`,
       label: "WhatsApp",
     },
   ]

@@ -1,24 +1,44 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
-import { updateOrderStatus } from "@/lib/repositories/admin-data"
-import { apiResponse } from "@/lib/api-response"
+import { db } from "@/lib/db"
+import { orders } from "@/lib/db/schema"
+import { eq } from "drizzle-orm"
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAdmin()
+    const { id } = await params
     const body = await req.json()
     const { status } = body
 
     if (!status) {
-      return apiResponse.badRequest("Status is required")
+      return NextResponse.json({ error: "Status is required" }, { status: 400 })
     }
 
-    const order = await updateOrderStatus(params.id, status)
-    return NextResponse.json(order)
+    const validStatuses = ["pending", "confirmed", "preparing", "ready", "delivered", "cancelled"]
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+    }
+
+    const updateData: Record<string, any> = { status }
+    if (status === "confirmed") updateData.confirmedAt = new Date().toISOString()
+    if (status === "delivered") updateData.deliveredAt = new Date().toISOString()
+
+    const [updated] = await db.update(orders)
+      .set(updateData)
+      .where(eq(orders.id, id))
+      .returning()
+
+    if (!updated) {
+      return NextResponse.json({ error: "Order not found" }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, id, status })
   } catch (error) {
-    return apiResponse.serverError()
+    console.error("Order status update error:", error)
+    return NextResponse.json({ error: "Something went wrong" }, { status: 500 })
   }
 }

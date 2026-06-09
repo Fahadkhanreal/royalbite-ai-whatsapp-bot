@@ -27,11 +27,11 @@ const config: Config = {
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         // Royal Spice Colors
-        "royal-red": "#9F1239",
-        "royal-orange": "#EA580C",
-        "royal-green": "#22C55E",
+        "royal-red": "#C9A227",
+        "royal-orange": "#D97706",
+        "royal-green": "#25D366",
         "royal-dark": "#0A0A0A",
-        "royal-light": "#FAF9F6",
+        "royal-light": "#F8F5F0",
       },
       borderRadius: {
         lg: "var(--radius)",

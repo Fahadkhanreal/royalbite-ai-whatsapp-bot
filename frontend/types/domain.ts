@@ -108,6 +108,15 @@ export interface RestaurantSettings {
   updatedAt: string
 }
 
+export interface GalleryItem {
+  id: string
+  src: string
+  alt: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface DashboardSummary {
   todayOrders: number
   pendingOrders: number

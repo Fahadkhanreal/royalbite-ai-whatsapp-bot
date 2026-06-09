@@ -1,101 +1,92 @@
 import { PageHeader } from "@/components/common/page-header"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { getRestaurantSettings } from "@/lib/repositories/admin-data"
-import { Settings as SettingsIcon, Phone, MapPin, Volume2 } from "lucide-react"
+import { Settings as SettingsIcon, Phone, MapPin, Volume2, KeyRound, Mail } from "lucide-react"
+import { ChangePassword } from "./change-password"
+import { ChangeEmail } from "./change-email"
 
 export default async function SettingsPage() {
   const settings = await getRestaurantSettings()
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        title="Settings"
-        description="Configure your restaurant profile, bot greeting, and voice settings."
-      />
+      <PageHeader title="Settings" description="Configure your restaurant profile, bot greeting, and voice settings." />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Restaurant Profile */}
-        <Card className="border-border/50 bg-gradient-to-br from-card to-card/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <SettingsIcon className="size-5 text-primary" />
-              Restaurant Profile
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium">Restaurant Name</Label>
-              <Input id="name" defaultValue={settings.restaurantName} className="border-border/50" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone" className="text-sm font-medium flex items-center gap-2">
-                <Phone className="size-4" />
-                Phone Number
-              </Label>
-              <Input id="phone" defaultValue={settings.phoneNumber} className="border-border/50" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="address" className="text-sm font-medium flex items-center gap-2">
-                <MapPin className="size-4" />
-                Address
-              </Label>
-              <Input id="address" defaultValue={settings.address} className="border-border/50" />
-            </div>
-            <Button className="w-full bg-primary hover:bg-primary/90">Save Changes</Button>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl p-6" style={{ background: "rgba(20,15,12,0.6)", border: "1px solid rgba(201,162,39,0.12)", boxShadow: "0 4px 24px rgba(0,0,0,0.2)" }}>
+          <h3 className="text-lg font-playfair font-bold mb-5 flex items-center gap-2" style={{ color: "#F8F5F0" }}>
+            <SettingsIcon className="size-5" style={{ color: "#C9A227" }} />
+            Restaurant Profile
+          </h3>
+          <div className="space-y-4">
+            {[
+              { id: "name", label: "Restaurant Name", value: settings.restaurantName },
+              { id: "phone", label: "Phone Number", icon: Phone, value: settings.phone },
+              { id: "address", label: "Address", icon: MapPin, value: settings.address },
+            ].map((field) => (
+              <div key={field.id} className="space-y-1.5">
+                <label className="text-sm font-medium flex items-center gap-2" style={{ color: "#F8F5F0" }}>
+                  {field.icon && <field.icon className="size-4" style={{ color: "#C9A227" }} />}
+                  {field.label}
+                </label>
+                <input defaultValue={field.value} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all focus:border-[#C9A227]"
+                  style={{ background: "rgba(10,10,10,0.6)", border: "1px solid rgba(201,162,39,0.2)", color: "#F8F5F0" }} />
+              </div>
+            ))}
+            <button className="w-full py-2.5 rounded-xl text-sm font-playfair font-bold transition-all hover:shadow-[0_0_40px_rgba(201,162,39,0.6)] hover:scale-[1.02]"
+              style={{ background: "linear-gradient(135deg, #C9A227, #A67D1F)", color: "#0A0A0A", boxShadow: "0 0 20px rgba(201,162,39,0.3)" }}>
+              Save Changes
+            </button>
+          </div>
+        </div>
 
         {/* Bot Configuration */}
-        <Card className="border-border/50 bg-gradient-to-br from-card to-card/50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <SettingsIcon className="size-5 text-primary" />
-              Bot Configuration
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="greeting" className="text-sm font-medium">Bot Greeting</Label>
-              <Input id="greeting" defaultValue={settings.botGreeting} className="border-border/50" />
+        <div className="rounded-xl p-6" style={{ background: "rgba(20,15,12,0.6)", border: "1px solid rgba(201,162,39,0.12)", boxShadow: "0 4px 24px rgba(0,0,0,0.2)" }}>
+          <h3 className="text-lg font-playfair font-bold mb-5 flex items-center gap-2" style={{ color: "#F8F5F0" }}>
+            <SettingsIcon className="size-5" style={{ color: "#C9A227" }} />
+            Bot Configuration
+          </h3>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium" style={{ color: "#F8F5F0" }}>Bot Tone</label>
+              <textarea defaultValue={settings.botTone} rows={3} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all"
+                style={{ background: "rgba(10,10,10,0.6)", border: "1px solid rgba(201,162,39,0.2)", color: "#F8F5F0" }} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="language" className="text-sm font-medium">Language</Label>
-              <Input id="language" defaultValue={settings.language} className="border-border/50" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="timezone" className="text-sm font-medium">Timezone</Label>
-              <Input id="timezone" defaultValue={settings.timezone} className="border-border/50" />
-            </div>
-            <Button className="w-full bg-primary hover:bg-primary/90">Save Changes</Button>
-          </CardContent>
-        </Card>
+            <button className="w-full py-2.5 rounded-xl text-sm font-playfair font-bold transition-all hover:shadow-[0_0_40px_rgba(201,162,39,0.6)] hover:scale-[1.02]"
+              style={{ background: "linear-gradient(135deg, #C9A227, #A67D1F)", color: "#0A0A0A", boxShadow: "0 0 20px rgba(201,162,39,0.3)" }}>
+              Save Changes
+            </button>
+          </div>
+        </div>
 
         {/* Voice Settings */}
-        <Card className="border-border/50 bg-gradient-to-br from-card to-card/50 lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Volume2 className="size-5 text-primary" />
-              Voice Settings
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="voice-lang" className="text-sm font-medium">Voice Language</Label>
-                <Input id="voice-lang" defaultValue={settings.voiceLanguage} className="border-border/50" />
+        <div className="rounded-xl p-6 lg:col-span-2" style={{ background: "rgba(20,15,12,0.6)", border: "1px solid rgba(201,162,39,0.12)", boxShadow: "0 4px 24px rgba(0,0,0,0.2)" }}>
+          <h3 className="text-lg font-playfair font-bold mb-5 flex items-center gap-2" style={{ color: "#F8F5F0" }}>
+            <Volume2 className="size-5" style={{ color: "#C9A227" }} />
+            Voice Settings
+          </h3>
+          <div className="grid gap-4 md:grid-cols-2 mb-4">
+            {[{ id: "voice-lang", label: "Voice Language", value: "en-US" },
+              { id: "voice-gender", label: "Voice Gender", value: "Female" }].map((field) => (
+              <div key={field.id} className="space-y-1.5">
+                <label className="text-sm font-medium" style={{ color: "#F8F5F0" }}>{field.label}</label>
+                <input defaultValue={field.value} className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all"
+                  style={{ background: "rgba(10,10,10,0.6)", border: "1px solid rgba(201,162,39,0.2)", color: "#F8F5F0" }} />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="voice-gender" className="text-sm font-medium">Voice Gender</Label>
-                <Input id="voice-gender" defaultValue={settings.voiceGender} className="border-border/50" />
-              </div>
-            </div>
-            <Button className="w-full bg-primary hover:bg-primary/90">Save Changes</Button>
-          </CardContent>
-        </Card>
+            ))}
+          </div>
+          <button className="w-full py-2.5 rounded-xl text-sm font-playfair font-bold transition-all hover:shadow-[0_0_40px_rgba(201,162,39,0.6)] hover:scale-[1.02]"
+            style={{ background: "linear-gradient(135deg, #C9A227, #A67D1F)", color: "#0A0A0A", boxShadow: "0 0 20px rgba(201,162,39,0.3)" }}>
+            Save Changes
+          </button>
+        </div>
       </div>
+
+      {/* Change Email */}
+      <ChangeEmail />
+
+      {/* Change Password */}
+      <ChangePassword />
     </div>
   )
 }

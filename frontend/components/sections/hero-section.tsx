@@ -20,15 +20,15 @@ export function HeroSection() {
     visible: {
       opacity: 1,
       y: 0,
-      transition: { duration: 0.8, ease: "easeOut" },
+      transition: { duration: 0.8, ease: "easeOut" as const },
     },
   }
 
   return (
     <section
       id="home"
-      className="relative min-h-screen w-full flex items-center justify-center overflow-hidden"
-      style={{ backgroundColor: "#0D1117" }}
+      className="relative min-h-screen w-full flex items-center justify-center overflow-hidden scroll-mt-24"
+      style={{ backgroundColor: "#0A0A0A" }}
     >
       {/* Background */}
       <div className="absolute inset-0 z-0">
@@ -38,21 +38,41 @@ export function HeroSection() {
             backgroundImage: "url('/hero-bg.jpg')",
             backgroundSize: "cover",
             backgroundPosition: "center",
-            backgroundAttachment: "fixed",
+            // backgroundAttachment: "fixed", — removed for scroll performance
           }}
         />
 
+        {/* Dark gradient overlay for depth */}
         <div
           className="absolute inset-0"
           style={{
-            background: "linear-gradient(135deg, rgba(13, 17, 23, 0.85) 0%, rgba(13, 17, 23, 0.95) 50%, rgba(13, 17, 23, 0.9) 100%)"
+            background: "linear-gradient(180deg, rgba(10,10,10,0.55) 0%, rgba(10,10,10,0.7) 30%, rgba(10,10,10,0.92) 70%, #0A0A0A 100%)"
           }}
         />
 
-        {/* Glows */}
-        <div className="absolute top-1/4 left-1/3 w-96 h-96 rounded-full mix-blend-screen filter blur-3xl animate-pulse" style={{ background: "rgba(201, 162, 39, 0.08)" }}></div>
-        <div className="absolute bottom-1/3 right-1/4 w-80 h-80 rounded-full mix-blend-screen filter blur-3xl animate-pulse" style={{ background: "rgba(15, 61, 62, 0.06)", animationDelay: '2s' }}></div>
+        {/* Warm vignette */}
+        <div className="absolute inset-0" style={{
+          background: "radial-gradient(ellipse at center, transparent 40%, rgba(10,10,10,0.6) 100%)"
+        }} />
+
+        {/* Dramatic light ray from top */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] opacity-20" style={{
+          background: "radial-gradient(ellipse at center, rgba(201,162,39,0.15) 0%, transparent 70%)",
+          transform: "translateX(-50%) skewX(-5deg)",
+          pointerEvents: "none",
+        }} />
+
+        {/* Soft golden glow */}
+        <div className="absolute inset-0" style={{
+          background: "radial-gradient(ellipse at 50% 30%, rgba(201,162,39,0.03) 0%, transparent 60%)",
+          pointerEvents: "none",
+        }} />
       </div>
+
+      {/* Decorative top border line */}
+      <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{
+        background: "linear-gradient(90deg, transparent, rgba(201,162,39,0.3), transparent)"
+      }} />
 
       {/* Content */}
       <motion.div
@@ -66,7 +86,7 @@ export function HeroSection() {
           className="mb-4 flex justify-center"
           variants={itemVariants}
         >
-          <div className="inline-flex items-center gap-3 px-5 py-3 rounded-full backdrop-blur-sm" style={{ border: "1.5px solid #C9A227", background: "rgba(201, 162, 39, 0.08)" }}>
+          <div className="inline-flex items-center gap-3 px-5 py-3 m-2 rounded-full backdrop-blur-sm" style={{ border: "1.5px solid #C9A227", background: "rgba(201, 162, 39, 0.08)" }}>
             <span style={{ color: "#C9A227" }} className="text-xs font-playfair tracking-[0.3em] uppercase font-bold">
               Premium Pakistani Cuisine
             </span>
@@ -91,7 +111,7 @@ export function HeroSection() {
             transition={{ duration: 4, repeat: Infinity }}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-0 group-hover:opacity-30 transform -skew-x-12 group-hover:translate-x-full transition-all duration-700"></div>
-            <span className="relative z-10" style={{ color: "#0D1117" }}>R</span>
+            <span className="relative z-10" style={{ color: "#0A0A0A" }}>R</span>
           </motion.div>
         </motion.div>
 
@@ -106,9 +126,9 @@ export function HeroSection() {
 
         {/* Tagline */}
         <motion.p
-          className="text-2xl sm:text-3xl font-playfair mb-6 tracking-wide font-semibold"
+          className="text-2xl sm:text-3xl font-playfair mb-4 tracking-[0.15em] font-semibold"
           variants={itemVariants}
-          style={{ color: "#C9A227" }}
+          style={{ color: "#C9A227", textShadow: "0 0 40px rgba(201,162,39,0.3)" }}
         >
           Taste the Royalty
         </motion.p>
@@ -119,7 +139,7 @@ export function HeroSection() {
           variants={itemVariants}
         >
           <p className="text-lg sm:text-xl leading-relaxed mb-4" style={{ color: "#A8B0B9" }}>
-            Experience exquisite premium Pakistani delicacies crafted with passion by award-winning master chefs. Every dish is a masterpiece of heritage, tradition, and culinary excellence.
+            Authentic Pakistani flavours, crafted with passion. Every dish tells a story of tradition.
           </p>
         </motion.div>
 
@@ -128,14 +148,14 @@ export function HeroSection() {
           className="flex justify-center items-center gap-4 mb-10"
           variants={itemVariants}
         >
-          <div className="h-px w-16" style={{ background: "linear-gradient(to right, transparent, #C9A227)" }}></div>
+          <div className="h-px w-24" style={{ background: "linear-gradient(to right, transparent, #C9A227)" }}></div>
           <motion.div
-            className="w-3 h-3 rounded-full"
+            className="w-2 h-2 rounded-full"
             style={{ backgroundColor: "#C9A227" }}
-            animate={{ scale: [1, 1.3, 1] }}
+            animate={{ scale: [1, 1.5, 1] }}
             transition={{ duration: 2, repeat: Infinity }}
           />
-          <div className="h-px w-16" style={{ background: "linear-gradient(to left, transparent, #C9A227)" }}></div>
+          <div className="h-px w-24" style={{ background: "linear-gradient(to left, transparent, #C9A227)" }}></div>
         </motion.div>
 
         {/* Buttons */}
@@ -150,7 +170,7 @@ export function HeroSection() {
             className="group relative w-full sm:w-auto px-14 py-6 rounded-xl font-bold text-lg overflow-hidden"
             style={{
               background: "linear-gradient(135deg, #C9A227, #A67D1F)",
-              color: "#0D1117",
+              color: "#0A0A0A",
               boxShadow: "0 0 30px rgba(201, 162, 39, 0.4)"
             }}
             whileHover={{

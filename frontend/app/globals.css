@@ -3,16 +3,33 @@
 @import "shadcn/tailwind.css";
 
 :root {
-  --background: 215 28% 6%;
-  --foreground: 210 40% 98%;
+  --background: 0 0% 4%;
+  --foreground: 40 30% 96%;
+  --card: 0 0% 4%;
+  --card-foreground: 40 30% 96%;
+  --popover: 0 0% 8%;
+  --popover-foreground: 40 30% 96%;
+  --primary: 43 74% 49%;
+  --primary-foreground: 0 0% 4%;
+  --secondary: 12 6% 15%;
+  --secondary-foreground: 40 30% 96%;
+  --muted: 12 6% 15%;
+  --muted-foreground: 24 5% 64%;
+  --accent: 43 74% 49%;
+  --accent-foreground: 0 0% 4%;
+  --destructive: 0 62% 30%;
+  --destructive-foreground: 40 30% 96%;
+  --border: 12 6% 20%;
+  --input: 12 6% 20%;
+  --ring: 43 74% 49%;
   --radius: 0.5rem;
   --gold: #C9A227;
-  --emerald: #0F3D3E;
-  --charcoal: #0D1117;
-  --darkBg: #161B22;
+  --gold-light: #E6C200;
+  --charcoal: #0A0A0A;
+  --darkBg: #120D0B;
   --ivory: #F8F5F0;
   --silver: #A8B0B9;
-  --border: #2A2F36;
+  --border: #2A201C;
 }
 
 @layer base {
@@ -22,11 +39,12 @@
 
   body {
     @apply min-h-full antialiased;
-    background: #0D1117;
-    color: #A8B0B9;
+    background: #0A0A0A;
+    color: #C0B8B0;
     background-image:
-      radial-gradient(circle at 20% 50%, rgba(201, 162, 39, 0.05) 0%, transparent 50%),
-      radial-gradient(circle at 80% 80%, rgba(15, 61, 62, 0.04) 0%, transparent 50%);
+      radial-gradient(circle at 15% 30%, rgba(201, 162, 39, 0.04) 0%, transparent 50%),
+      radial-gradient(circle at 85% 70%, rgba(201, 162, 39, 0.03) 0%, transparent 50%),
+      radial-gradient(circle at 50% 50%, rgba(40, 30, 25, 0.3) 0%, transparent 80%);
     font-family: "Inter", system-ui, sans-serif;
     line-height: 1.8;
   }
@@ -172,15 +190,15 @@
   }
 
   .glass {
-    background: rgba(22, 27, 34, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(201, 162, 39, 0.1);
+    background: rgba(18, 13, 11, 0.75);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(201, 162, 39, 0.12);
   }
 
   .glass-dark {
-    background: rgba(10, 10, 10, 0.5);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(42, 47, 54, 0.5);
+    background: rgba(10, 10, 10, 0.6);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(42, 32, 28, 0.6);
   }
 
   .gradient-gold {
@@ -202,25 +220,28 @@
   }
 
   .card-hover {
-    @apply transition-all duration-300 hover:shadow-lg;
-    border-color: rgba(201, 162, 39, 0.2);
+    @apply transition-all duration-300;
+    border-color: rgba(201, 162, 39, 0.15);
   }
 
   .card-hover:hover {
     border-color: #C9A227;
-    background-color: rgba(201, 162, 39, 0.05);
+    background-color: rgba(201, 162, 39, 0.06);
+    box-shadow: 0 8px 40px rgba(201, 162, 39, 0.08);
   }
 
   .btn-gold {
     background: linear-gradient(135deg, #C9A227, #A67D1F);
-    color: #0D1117;
+    color: #0A0A0A;
     transition: all 0.3s ease;
-    box-shadow: 0 0 20px rgba(201, 162, 39, 0.3);
+    box-shadow: 0 0 30px rgba(201, 162, 39, 0.25);
+    font-weight: 600;
+    letter-spacing: 0.02em;
   }
 
   .btn-gold:hover {
-    box-shadow: 0 0 40px rgba(201, 162, 39, 0.6);
-    transform: scale(1.05);
+    box-shadow: 0 0 60px rgba(201, 162, 39, 0.5);
+    transform: scale(1.06);
   }
 
   .btn-outline-gold {
@@ -259,10 +280,10 @@
   }
 
   .bg-charcoal {
-    background-color: #0D1117;
+    background-color: #0A0A0A;
   }
 
   .bg-darkBg {
-    background-color: #161B22;
+    background-color: #120D0B;
   }
 }

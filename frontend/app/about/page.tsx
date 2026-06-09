@@ -1,6 +1,17 @@
+import type { Metadata } from "next"
 import { FloatingWhatsAppButton } from "@/components/common/floating-whatsapp-button"
 import { Card, CardContent } from "@/components/ui/card"
 import { CheckCircle } from "lucide-react"
+
+export const metadata: Metadata = {
+  title: "About Us",
+  description:
+    "Learn about RoyalBite — premium Pakistani restaurant in Karachi. AI-powered WhatsApp ordering, verified knowledge base, and admin-controlled menu.",
+  openGraph: {
+    title: "About RoyalBite - Premium Pakistani Restaurant Karachi",
+    description: "Discover how RoyalBite combines authentic Pakistani cuisine with smart AI-powered WhatsApp ordering for a premium experience.",
+  },
+}
 
 export default function AboutPage() {
   const values = [

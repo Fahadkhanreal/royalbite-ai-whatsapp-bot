@@ -18,7 +18,7 @@ export function Navbar() {
   ]
 
   return (
-    <nav className="sticky top-0 z-50 w-full backdrop-blur-md" style={{ backgroundColor: "rgba(13, 17, 23, 0.9)", borderBottom: "1px solid rgba(42, 47, 54, 0.5)" }}>
+    <nav className="sticky top-0 z-50 w-full backdrop-blur-md" style={{ backgroundColor: "rgba(10, 10, 10, 0.92)", borderBottom: "1px solid rgba(42, 32, 28, 0.5)" }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
