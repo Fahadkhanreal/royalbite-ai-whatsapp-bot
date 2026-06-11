@@ -58,7 +58,7 @@ export async function generateReply(
     // Search RAG for relevant context
     const searchResult = await hybridSearch(userMessage, {
       limit: 3,
-      minSimilarity: 0.4,
+      minSimilarity: 0.25, // Lowered from 0.4 for hash-based embeddings
     });
 
     // Build context from search results
