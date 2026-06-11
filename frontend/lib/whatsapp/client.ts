@@ -2,8 +2,7 @@
 import { env } from '@/lib/env';
 import { WhatsAppError } from '@/lib/errors';
 
-const WATI_BASE_URL = 'https://live-mt-server.wati.io/10180462';
-const WATI_TOKEN = 'wati_6be060f6-5221-42f9-9f1a-72ef746b9baf.-5Hpdc3_Sis1yZRBVu8z0V082Ol12DmI0LSIesbk-idp96KuYF3AZ-oaY_4Cu2BoudQryFomfNU3QkxiiuSvvfrJNReLbDtUgoypc6UQm5HQquZ4oK4SJzsik86MyDI3';
+const WATI_BASE_URL = env.WATI_BASE_URL.replace(/\/$/, '');
 
 interface WhatsAppResponse {
   result: boolean;
@@ -13,25 +12,42 @@ interface WhatsAppResponse {
 export async function sendWhatsAppMessage(to: string, text: string): Promise<WhatsAppResponse> {
   const formattedNumber = to.replace(/[^0-9]/g, '');
 
+  if (!env.WHATSAPP_API_TOKEN) {
+    throw new WhatsAppError('WHATSAPP_API_TOKEN is not configured');
+  }
+
+  if (!formattedNumber) {
+    throw new WhatsAppError('WhatsApp recipient number is missing');
+  }
+
   const response = await fetch(
     `${WATI_BASE_URL}/api/v1/sendSessionMessage/${formattedNumber}`,
     {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${WATI_TOKEN}`,
+        'Authorization': `Bearer ${env.WHATSAPP_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ messageText: text }),
     }
   );
 
-  const data = await response.json();
+  const data = await response.json().catch(() => ({
+    result: false,
+    info: `Invalid WATI response with status ${response.status}`,
+  }));
 
-  if (!data.result) {
-    console.error('WATI send error:', data.info);
-    // Don't throw — WATI returns 200 even on fail
+  if (!response.ok || !data.result) {
+    console.error('WATI send error:', {
+      status: response.status,
+      to: formattedNumber,
+      info: data.info,
+      response: data,
+    });
+    throw new WhatsAppError(data.info || `WATI send failed with status ${response.status}`);
   }
 
+  console.info('WATI message sent:', { to: formattedNumber, status: response.status });
   return data;
 }
 

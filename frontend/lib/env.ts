@@ -22,6 +22,7 @@ const envSchema = z.object({
   WHATSAPP_BUSINESS_PHONE_NUMBER: z.string().optional().default('+923181215427'),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().optional().default(''),
   WHATSAPP_API_TOKEN: z.string().optional().default(''),
+  WATI_BASE_URL: z.string().optional().default('https://live-mt-server.wati.io/10180462'),
 
   // NextAuth
   AUTH_SECRET: z.string().optional().default(''),
@@ -64,6 +65,7 @@ function parseEnv() {
       WHATSAPP_BUSINESS_PHONE_NUMBER: process.env.WHATSAPP_BUSINESS_PHONE_NUMBER || '+923181215427',
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '',
       WHATSAPP_API_TOKEN: process.env.WHATSAPP_API_TOKEN || '',
+      WATI_BASE_URL: process.env.WATI_BASE_URL || 'https://live-mt-server.wati.io/10180462',
       AUTH_SECRET: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'royalbite-dev-secret-key-change-in-production',
       AUTH_URL: process.env.AUTH_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000',
       NODE_ENV: (process.env.NODE_ENV as 'development' | 'production' | 'test') || 'development',

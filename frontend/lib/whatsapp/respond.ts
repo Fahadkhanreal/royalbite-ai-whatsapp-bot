@@ -61,6 +61,14 @@ export async function generateReply(
       minSimilarity: 0.25, // Lowered from 0.4 for hash-based embeddings
     });
 
+    console.info('[RAG] Search completed:', {
+      query: userMessage.slice(0, 50),
+      totalResults: searchResult.totalResults,
+      tookMs: searchResult.tookMs,
+      hasContext: searchResult.results.length > 0,
+      topSimilarity: searchResult.results[0]?.similarity || 0,
+    });
+
     // Build context from search results
     const contextText = searchResult.results
       .map(r => r.content)
@@ -68,17 +76,29 @@ export async function generateReply(
 
     // If no context found, return a helpful message
     if (!contextText) {
+      console.warn('[RAG] No context found for query:', userMessage.slice(0, 50));
       return `I'd be happy to help you with that! Unfortunately, I don't have specific information about that right now. Could you please rephrase your question? You can ask about our menu, timings, or place an order.`;
     }
 
     const context = `Relevant information:\n${contextText}\n\nUser question: ${userMessage}`;
 
+    console.info('[Groq] Generating response with context length:', contextText.length);
+
     // Generate response using Groq
     const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 300);
 
+    console.info('[Groq] Response generated:', {
+      replyLength: reply.length,
+      query: userMessage.slice(0, 50),
+    });
+
     return reply;
   } catch (error) {
-    console.error('Response generation failed:', error);
+    console.error('[RESPOND] Response generation failed:', {
+      error: error instanceof Error ? error.message : String(error),
+      query: userMessage.slice(0, 50),
+      intent: intent.action,
+    });
 
     // Fallback response
     return `Thank you for your message! Our team is currently reviewing it and will get back to you shortly. For immediate assistance, you can call us directly.`;
