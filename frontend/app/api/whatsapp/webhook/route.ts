@@ -15,20 +15,22 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Read body via multiple methods for Vercel compatibility
+    // Read body as text — Vercel Edge runtime sometimes eats the body on first read
+    // so we try request.text() first
+    const cloned = request.clone();
     let rawText = '';
 
     try {
-      rawText = await request.text();
+      rawText = await cloned.text();
     } catch {
-      // fallback: do nothing
+      // ignore
     }
 
     if (!rawText || rawText.trim().length === 0) {
-      console.log('Webhook: request.text() returned empty, trying request.json() fallback');
+      console.log('Webhook: empty body from text(), trying request.json()');
       try {
-        const body = await request.clone().json();
-        rawText = JSON.stringify(body);
+        const jsonBody = await request.json();
+        rawText = JSON.stringify(jsonBody);
       } catch {
         console.log('Webhook: request.json() also failed');
       }
@@ -44,7 +46,6 @@ export async function POST(request: NextRequest) {
       body = JSON.parse(rawText);
     } catch (parseError) {
       console.error('JSON parse error, raw body:', rawText.slice(0, 300));
-      // Try URL-encoded form data
       if (rawText.includes('=')) {
         const params = new URLSearchParams(rawText);
         const jsonObj: Record<string, string> = {};
@@ -132,7 +133,6 @@ export async function POST(request: NextRequest) {
       reply = await generateReply(text, intent);
     }
 
-    // Send via WATI
     await sendWhatsAppMessage(from, reply);
     console.log(`Reply sent successfully to ${from}`);
 
