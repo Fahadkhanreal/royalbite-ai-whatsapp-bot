@@ -28,6 +28,7 @@ function parseWatiMessage(body: Record<string, any>): ParsedMessage {
   const nestedMessage = data.message || body.message || {};
   const textObject = body.text || data.text || nestedMessage.text || {};
 
+  // Extract phone number
   const from =
     getString(body.from) ||
     getString(body.waId) ||
@@ -44,20 +45,33 @@ function parseWatiMessage(body: Record<string, any>): ParsedMessage {
     getString(nestedMessage.from) ||
     getString(nestedMessage.waId);
 
-  const msgText =
-    getString(body.body) ||
-    getString(body.content) ||
-    getString(body.messageText) ||
-    getString(body.message?.text) ||
-    getString(textObject.body) ||
-    getString(textObject.text) ||
-    getString(data.body) ||
-    getString(data.content) ||
-    getString(data.messageText) ||
-    getString(data.text) ||
-    getString(nestedMessage.body) ||
-    getString(nestedMessage.content) ||
-    getString(nestedMessage.messageText);
+  // Extract message text - WATI specific parsing
+  let msgText = '';
+
+  // Priority 1: Direct text field (WATI sends it here)
+  if (typeof body.text === 'string') {
+    msgText = body.text.trim();
+  } else if (body.text && typeof body.text === 'object' && body.text.body) {
+    msgText = getString(body.text.body);
+  }
+
+  // Priority 2: Standard fields
+  if (!msgText) {
+    msgText =
+      getString(body.body) ||
+      getString(body.content) ||
+      getString(body.messageText) ||
+      getString(body.message?.text) ||
+      getString(body.message?.body) ||
+      getString(textObject.body) ||
+      getString(data.body) ||
+      getString(data.content) ||
+      getString(data.messageText) ||
+      getString(data.text) ||
+      getString(nestedMessage.body) ||
+      getString(nestedMessage.content) ||
+      getString(nestedMessage.messageText);
+  }
 
   return {
     from,
@@ -96,6 +110,15 @@ export async function POST(req: Request) {
     from = parsed.from;
     msgText = parsed.msgText;
 
+    // Debug: Log the actual text field to see what WATI sends
+    console.info('[WEBHOOK] Raw payload analysis:', {
+      hasBodyText: typeof body.text,
+      bodyTextValue: typeof body.text === 'string' ? body.text : JSON.stringify(body.text).slice(0, 100),
+      hasBodyBody: typeof body.body,
+      eventType: body.eventType,
+      type: body.type,
+    });
+
     // Meta API format
     if (!from && body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
       const m = body.entry[0].changes[0].value.messages[0];
@@ -107,7 +130,8 @@ export async function POST(req: Request) {
       eventType: parsed.eventType || 'unknown',
       hasFrom: Boolean(from),
       hasMessage: Boolean(msgText),
-      bodyKeys: Object.keys(body),
+      msgTextPreview: msgText ? msgText.slice(0, 50) : 'EMPTY',
+      bodyKeys: Object.keys(body).slice(0, 15),
       rawPreview: raw.slice(0, 200),
     });
 
