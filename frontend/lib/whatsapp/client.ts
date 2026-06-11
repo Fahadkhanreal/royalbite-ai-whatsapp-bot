@@ -1,46 +1,43 @@
-// WhatsApp Cloud API client
+// WATI WhatsApp API client
 // Location: lib/whatsapp/client.ts
-// Handles sending messages via Meta WhatsApp Cloud API
+// Handles sending messages via WATI API (alternative to Meta Cloud API)
 
 import { env } from '@/lib/env';
 import { WhatsAppError } from '@/lib/errors';
 
-const API_VERSION = 'v22.0';
-const BASE_URL = `https://graph.facebook.com/${API_VERSION}/${env.WHATSAPP_BUSINESS_PHONE_NUMBER_ID}`;
+const WATI_BASE_URL = 'https://api.wati.io/api/v1';
 
 interface WhatsAppResponse {
-  messaging_product: string;
-  contacts: Array<{ input: string; wa_id: string }>;
-  messages: Array<{ id: string }>;
+  success: boolean;
+  messageId?: string;
+  [key: string]: any;
 }
 
 /**
- * Send a text message via WhatsApp Cloud API
+ * Send a text message via WATI API
  */
 export async function sendWhatsAppMessage(
   to: string,
   text: string
 ): Promise<WhatsAppResponse> {
   try {
-    const response = await fetch(`${BASE_URL}/messages`, {
+    const formattedNumber = to.replace(/[^0-9]/g, '');
+
+    const response = await fetch(`${WATI_BASE_URL}/sendSessionMessage/${formattedNumber}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${env.WHATSAPP_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to,
-        type: 'text',
-        text: { body: text },
+        messageText: text,
       }),
     });
 
     if (!response.ok) {
       const errorBody = await response.text();
       throw new WhatsAppError(
-        `WhatsApp API error: ${response.status}`,
+        `WATI API error: ${response.status}`,
         { status: response.status, body: errorBody.slice(0, 500) }
       );
     }
@@ -50,39 +47,39 @@ export async function sendWhatsAppMessage(
   } catch (error) {
     if (error instanceof WhatsAppError) throw error;
     throw new WhatsAppError(
-      'Failed to send WhatsApp message',
+      'Failed to send WhatsApp message via WATI',
       { originalError: error instanceof Error ? error.message : 'Unknown error' }
     );
   }
 }
 
 /**
- * Send a voice/audio message via WhatsApp
+ * Send a voice/audio message via WATI
+ * Note: WATI requires audio URL to be accessible publicly
  */
 export async function sendWhatsAppAudio(
   to: string,
   audioUrl: string
 ): Promise<WhatsAppResponse> {
   try {
-    const response = await fetch(`${BASE_URL}/messages`, {
+    const formattedNumber = to.replace(/[^0-9]/g, '');
+
+    const response = await fetch(`${WATI_BASE_URL}/sendSessionMessage/${formattedNumber}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${env.WHATSAPP_API_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        recipient_type: 'individual',
-        to,
-        type: 'audio',
-        audio: { link: audioUrl },
+        messageText: '🔊 *Voice message*',
+        audio: audioUrl,
       }),
     });
 
     if (!response.ok) {
       const errorBody = await response.text();
       throw new WhatsAppError(
-        `WhatsApp API audio error: ${response.status}`,
+        `WATI API audio error: ${response.status}`,
         { status: response.status, body: errorBody.slice(0, 500) }
       );
     }
@@ -92,68 +89,40 @@ export async function sendWhatsAppAudio(
   } catch (error) {
     if (error instanceof WhatsAppError) throw error;
     throw new WhatsAppError(
-      'Failed to send WhatsApp audio message',
+      'Failed to send WhatsApp audio message via WATI',
       { originalError: error instanceof Error ? error.message : 'Unknown error' }
     );
   }
 }
 
 /**
- * Upload media to WhatsApp servers (for voice messages)
+ * Upload media to WATI (for voice messages)
+ * WATI accepts public URLs directly, no upload needed
  */
 export async function uploadWhatsAppMedia(
   fileUrl: string,
   mimeType: string = 'audio/ogg'
 ): Promise<string> {
-  try {
-    const response = await fetch(`${BASE_URL}/media`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.WHATSAPP_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        type: mimeType,
-        link: fileUrl,
-      }),
-    });
-
-    if (!response.ok) {
-      throw new WhatsAppError('Failed to upload media to WhatsApp');
-    }
-
-    const data = await response.json();
-    return data.id;
-  } catch (error) {
-    if (error instanceof WhatsAppError) throw error;
-    throw new WhatsAppError(
-      'Media upload failed',
-      { originalError: error instanceof Error ? error.message : 'Unknown error' }
-    );
-  }
+  // WATI uses direct URLs, just return the URL
+  return fileUrl;
 }
 
 /**
  * Mark message as read
  */
 export async function markAsRead(messageId: string): Promise<void> {
-  try {
-    await fetch(`${BASE_URL}/messages`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${env.WHATSAPP_API_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messaging_product: 'whatsapp',
-        status: 'read',
-        message_id: messageId,
-      }),
-    });
-  } catch (error) {
-    console.error('Failed to mark message as read:', error);
-  }
+  // WATI auto-marks as read, no explicit API needed
+  console.log('WATI: auto-read enabled, skipping markAsRead');
+}
+
+/**
+ * Set up WATI webhook
+ * WATI will call this URL when messages arrive
+ */
+export function getWebhookUrl(): string {
+  return process.env.NEXT_PUBLIC_SITE_URL
+    ? `${process.env.NEXT_PUBLIC_SITE_URL}/api/whatsapp/webhook`
+    : 'http://localhost:3000/api/whatsapp/webhook';
 }
 
 /**
@@ -164,7 +133,7 @@ export function verifyWebhookToken(token: string): boolean {
 }
 
 /**
- * Format phone number to WhatsApp international format
+ * Format phone number to international format (remove + and spaces)
  */
 export function formatWhatsAppNumber(phone: string): string {
   return phone.replace(/[^0-9]/g, '');

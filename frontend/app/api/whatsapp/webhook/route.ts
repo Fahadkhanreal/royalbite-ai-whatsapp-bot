@@ -1,24 +1,16 @@
-// WhatsApp Webhook handler
+// WhatsApp Webhook handler (WATI compatible)
 // Location: app/api/whatsapp/webhook/route.ts
-// Meta WhatsApp Cloud API webhook - handles both GET (verification) and POST (messages)
+// Handles both WATI webhook (POST) and Meta verification (GET)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env';
 import { successResponse, errorResponse } from '@/lib/response';
 import { WhatsAppError } from '@/lib/errors';
 import { processIncomingMessage } from '@/lib/whatsapp/processor';
-import { whatsappRateLimit } from '@/lib/middleware/rateLimit';
 
 /**
  * GET /api/whatsapp/webhook
- *
- * WhatsApp Cloud API webhook verification.
- * Meta sends a GET request with hub.challenge to verify the webhook endpoint.
- *
- * Query Params:
- *   hub.mode: string (should be 'subscribe')
- *   hub.verify_token: string (should match WHATSAPP_WEBHOOK_VERIFY_TOKEN)
- *   hub.challenge: string (echo this back to verify)
+ * WATI webhook verification (optional)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -27,22 +19,17 @@ export async function GET(request: NextRequest) {
     const token = searchParams.get('hub.verify_token');
     const challenge = searchParams.get('hub.challenge');
 
-    console.log('Webhook verification request:', { mode, tokenProvided: !!token, challengeProvided: !!challenge });
-
-    // Verify mode and token
+    // WATI verification
     if (mode === 'subscribe' && token === env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
-      console.log('Webhook verified successfully');
+      console.log('WATI Webhook verified successfully');
       return new NextResponse(challenge, { status: 200 });
     }
 
-    // Verification failed
-    console.warn('Webhook verification failed - invalid token or mode');
     return NextResponse.json(
       errorResponse(new WhatsAppError('Webhook verification failed')),
       { status: 403 }
     );
   } catch (error) {
-    console.error('Webhook GET error:', error);
     return NextResponse.json(
       errorResponse(new WhatsAppError('Webhook verification error')),
       { status: 500 }
@@ -52,69 +39,56 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/whatsapp/webhook
+ * Receive incoming messages from WATI
  *
- * Receive incoming WhatsApp messages from Meta Cloud API.
- * Processes text messages, detects intent, and generates responses.
+ * WATI sends messages in this format:
+ * {
+ *   "id": "msg_id",
+ *   "from": "923001234567",      // Sender's number
+ *   "text": "Hello",              // Message text
+ *   "timestamp": "1234567890"
+ * }
  */
 export async function POST(request: NextRequest) {
   try {
-    // Apply rate limiting
-    const rateLimitResponse = whatsappRateLimit(request);
-    if (rateLimitResponse) {
-      return rateLimitResponse;
-    }
-
-    // Parse the incoming webhook payload
     const body = await request.json();
 
-    console.log('WhatsApp webhook received:', JSON.stringify(body).slice(0, 500));
+    console.log('WATI webhook received:', JSON.stringify(body).slice(0, 500));
 
-    // Extract message from Meta's webhook payload format
-    const entry = body?.entry?.[0];
-    const change = entry?.changes?.[0];
-    const value = change?.value;
+    // WATI format: { id, from, text, timestamp }
+    // or array of messages
+    const messages = Array.isArray(body) ? body : [body];
 
-    if (!value) {
-      return NextResponse.json(
-        successResponse({ status: 'no_message' }),
-        { status: 200 }
-      );
-    }
-
-    // Check for incoming messages
-    const messages = value.messages;
-    if (!messages || messages.length === 0) {
-      // Could be a status update, just acknowledge
-      return NextResponse.json(
-        successResponse({ status: 'acknowledged' }),
-        { status: 200 }
-      );
-    }
-
-    // Process each incoming message
     const results = await Promise.allSettled(
-      messages.map((msg: any) => processIncomingMessage(msg, value.metadata))
+      messages.map((msg: any) => {
+        // Convert WATI format to internal format
+        const internalMsg = {
+          from: msg.from,
+          id: msg.id,
+          timestamp: msg.timestamp || String(Date.now()),
+          text: { body: msg.text || '' },
+          type: 'text',
+        };
+        const metadata = {
+          phone_number_id: msg.from || '',
+          display_phone_number: msg.from || '',
+        };
+        return processIncomingMessage(internalMsg, metadata);
+      })
     );
 
-    // Log any failures
     for (const result of results) {
       if (result.status === 'rejected') {
         console.error('Message processing failed:', result.reason);
       }
     }
 
-    // Always return 200 to acknowledge receipt
     return NextResponse.json(
-      successResponse({
-        processed: messages.length,
-        status: 'ok',
-      }),
+      successResponse({ processed: messages.length, status: 'ok' }),
       { status: 200 }
     );
   } catch (error) {
-    console.error('WhatsApp webhook POST error:', error);
-
-    // Always return 200 to prevent Meta from retrying endlessly
+    console.error('WATI webhook error:', error);
     return NextResponse.json(
       successResponse({ status: 'acknowledged' }),
       { status: 200 }
