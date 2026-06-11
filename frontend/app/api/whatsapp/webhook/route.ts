@@ -5,6 +5,8 @@ import { generateReply } from '@/lib/whatsapp/respond';
 import { detectIntent } from '@/lib/whatsapp/intent';
 import { detectAndCreateOrder } from '@/lib/orders/createFromWhatsApp';
 
+export const runtime = 'nodejs';
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const challenge = searchParams.get('hub.challenge');
@@ -12,11 +14,25 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  let rawText = '';
-
   try {
-    // IMPORTANT: Read body as text first (request.json() fails on Vercel with empty body)
-    rawText = await request.text();
+    // Read body via multiple methods for Vercel compatibility
+    let rawText = '';
+
+    try {
+      rawText = await request.text();
+    } catch {
+      // fallback: do nothing
+    }
+
+    if (!rawText || rawText.trim().length === 0) {
+      console.log('Webhook: request.text() returned empty, trying request.json() fallback');
+      try {
+        const body = await request.clone().json();
+        rawText = JSON.stringify(body);
+      } catch {
+        console.log('Webhook: request.json() also failed');
+      }
+    }
 
     if (!rawText || rawText.trim().length === 0) {
       console.log('Webhook received empty body');
@@ -28,7 +44,7 @@ export async function POST(request: NextRequest) {
       body = JSON.parse(rawText);
     } catch (parseError) {
       console.error('JSON parse error, raw body:', rawText.slice(0, 300));
-      // Try to parse as URL-encoded form data
+      // Try URL-encoded form data
       if (rawText.includes('=')) {
         const params = new URLSearchParams(rawText);
         const jsonObj: Record<string, string> = {};
@@ -36,7 +52,6 @@ export async function POST(request: NextRequest) {
           jsonObj[key] = val;
         }
         body = jsonObj;
-        console.log('Parsed as form-urlencoded:', JSON.stringify(jsonObj));
       } else {
         return NextResponse.json({ status: 'invalid_json', error: String(parseError) }, { status: 200 });
       }
@@ -44,34 +59,36 @@ export async function POST(request: NextRequest) {
 
     console.log('Webhook received:', JSON.stringify(body).slice(0, 500));
 
-    // Support BOTH Meta format AND WATI format
+    // Extract message from various formats
     let from = '';
     let text = '';
 
-    // Format 1: Meta Cloud API format
+    // Format 1: Meta Cloud API
     const metaMsg = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
     if (metaMsg) {
       from = metaMsg.from || '';
       text = metaMsg.text?.body || '';
     }
-    // Format 2: WATI format { from, text, id, timestamp }
+    // Format 2: WATI standard
     else if (body.from && (body.text || body.body)) {
       from = body.from;
       text = body.text || body.body || '';
     }
-    // Format 3: WATI with waId or sender
+    // Format 3: WATI with waId
     else if (body.waId || body.from || body.sender) {
       from = body.waId || body.from || body.sender || '';
       text = body.text?.body || body.body || body.text || body.message || '';
     }
-    // Format 4: Check messages array
+    // Format 4: messages array
     else if (body.messages && Array.isArray(body.messages) && body.messages[0]) {
       const msg = body.messages[0];
       from = msg.from || msg.waId || '';
       text = msg.text?.body || msg.body || msg.text || '';
     }
 
-    // Clean phone number
+    if (!from) from = '';
+    if (!text) text = '';
+
     from = from.replace(/[^0-9]/g, '');
 
     if (!text || !from) {
@@ -81,12 +98,9 @@ export async function POST(request: NextRequest) {
 
     console.log(`Processing: from=${from}, text=${text}`);
 
-    // Detect intent
     const intent = await detectIntent(text);
-
     let reply: string;
 
-    // Handle orders specially
     if (intent.action === 'order') {
       try {
         const orderResult = await detectAndCreateOrder(text, from);
@@ -120,8 +134,8 @@ export async function POST(request: NextRequest) {
 
     // Send via WATI
     await sendWhatsAppMessage(from, reply);
-
     console.log(`Reply sent successfully to ${from}`);
+
     return NextResponse.json({ status: 'ok', reply_sent: true }, { status: 200 });
   } catch (error: any) {
     console.error('Webhook error:', error?.message || error);
