@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { Menu, X } from "lucide-react"
 import { motion } from "framer-motion"
+import { WHATSAPP_NUMBER } from "@/lib/constants"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
@@ -72,7 +73,7 @@ export function Navbar() {
           {/* CTA Button */}
           <div className="hidden md:flex items-center space-x-4">
             <motion.a
-              href="https://wa.me/923001234567?text=Hi%20RoyalBite%2C%20I%20want%20to%20order"
+              href={`https://wa.me/${WHATSAPP_NUMBER.replace("+", "")}?text=Hi%20RoyalBite%2C%20I%20want%20to%20order`}
               target="_blank"
               rel="noopener noreferrer"
               className="group relative px-8 py-2.5 rounded-full font-semibold text-black overflow-hidden"
@@ -135,7 +136,7 @@ export function Navbar() {
               </motion.a>
             ))}
             <motion.a
-              href="https://wa.me/923001234567?text=Hi%20RoyalBite%2C%20I%20want%20to%20order"
+              href={`https://wa.me/${WHATSAPP_NUMBER.replace("+", "")}?text=Hi%20RoyalBite%2C%20I%20want%20to%20order`}
               target="_blank"
               rel="noopener noreferrer"
               className="block w-full rounded-full mt-4 font-semibold py-2.5 text-center text-black font-playfair"

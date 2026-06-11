@@ -24,7 +24,7 @@ export const PUBLIC_NAV_ITEMS = [
   { title: "About", href: "/about" },
 ] as const
 
-export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "+923482240731"
+export const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "+923181215427"
 
 export const DISHES = [
   {

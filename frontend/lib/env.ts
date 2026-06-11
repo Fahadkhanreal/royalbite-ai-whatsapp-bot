@@ -19,7 +19,7 @@ const envSchema = z.object({
   // WhatsApp (optional, needed only for bot)
   WHATSAPP_BUSINESS_ACCOUNT_ID: z.string().optional().default(''),
   WHATSAPP_BUSINESS_PHONE_NUMBER_ID: z.string().optional().default(''),
-  WHATSAPP_BUSINESS_PHONE_NUMBER: z.string().optional().default('+923482240731'),
+  WHATSAPP_BUSINESS_PHONE_NUMBER: z.string().optional().default('+923181215427'),
   WHATSAPP_WEBHOOK_VERIFY_TOKEN: z.string().optional().default(''),
   WHATSAPP_API_TOKEN: z.string().optional().default(''),
 
@@ -61,7 +61,7 @@ function parseEnv() {
       GOOGLE_TTS_PROJECT_ID: process.env.GOOGLE_TTS_PROJECT_ID || '',
       WHATSAPP_BUSINESS_ACCOUNT_ID: process.env.WHATSAPP_BUSINESS_ACCOUNT_ID || '',
       WHATSAPP_BUSINESS_PHONE_NUMBER_ID: process.env.WHATSAPP_BUSINESS_PHONE_NUMBER_ID || '',
-      WHATSAPP_BUSINESS_PHONE_NUMBER: process.env.WHATSAPP_BUSINESS_PHONE_NUMBER || '+923482240731',
+      WHATSAPP_BUSINESS_PHONE_NUMBER: process.env.WHATSAPP_BUSINESS_PHONE_NUMBER || '+923181215427',
       WHATSAPP_WEBHOOK_VERIFY_TOKEN: process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || '',
       WHATSAPP_API_TOKEN: process.env.WHATSAPP_API_TOKEN || '',
       AUTH_SECRET: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'royalbite-dev-secret-key-change-in-production',

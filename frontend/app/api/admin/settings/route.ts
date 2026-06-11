@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
       id: "settings_royalbite",
       restaurantName: "RoyalBite",
       description: "Premium Pakistani restaurant with AI chatbot.",
-      phone: "+923482240731",
+      phone: "+923181215427",
       address: "Karachi, Pakistan",
       brandColors: { primary: "#C9A227", secondary: "#A67D1F" },
       botTone: "Friendly Pakistani restaurant waiter using Roman Urdu and English.",

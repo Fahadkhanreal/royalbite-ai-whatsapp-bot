@@ -164,7 +164,7 @@ export function HeroSection() {
           variants={itemVariants}
         >
           <motion.a
-            href="https://wa.me/923001234567?text=Hi%20RoyalBite%2C%20I%20want%20to%20order"
+            href={`https://wa.me/${"923181215427"}?text=Hi%20RoyalBite%2C%20I%20want%20to%20order`}
             target="_blank"
             rel="noopener noreferrer"
             className="group relative w-full sm:w-auto px-14 py-6 rounded-xl font-bold text-lg overflow-hidden"
