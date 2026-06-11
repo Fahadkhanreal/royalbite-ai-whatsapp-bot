@@ -15,96 +15,90 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    // Read body as text — Vercel Edge runtime sometimes eats the body on first read
-    // so we try request.text() first
-    const cloned = request.clone();
-    let rawText = '';
+    // First check content-type
+    const contentType = request.headers.get('content-type') || '';
 
-    try {
-      rawText = await cloned.text();
-    } catch {
-      // ignore
-    }
+    // Build body from either JSON or form-data
+    let body: Record<string, any> = {};
 
-    if (!rawText || rawText.trim().length === 0) {
-      console.log('Webhook: empty body from text(), trying request.json()');
+    if (contentType.includes('json') || contentType.includes('text/plain')) {
+      // For JSON, read text first then parse
       try {
-        const jsonBody = await request.json();
-        rawText = JSON.stringify(jsonBody);
-      } catch {
-        console.log('Webhook: request.json() also failed');
-      }
-    }
-
-    if (!rawText || rawText.trim().length === 0) {
-      console.log('Webhook received empty body');
-      return NextResponse.json({ status: 'empty_body' }, { status: 200 });
-    }
-
-    let body: any;
-    try {
-      body = JSON.parse(rawText);
-    } catch (parseError) {
-      console.error('JSON parse error, raw body:', rawText.slice(0, 300));
-      if (rawText.includes('=')) {
-        const params = new URLSearchParams(rawText);
-        const jsonObj: Record<string, string> = {};
-        for (const [key, val] of params.entries()) {
-          jsonObj[key] = val;
+        const raw = await request.text();
+        if (raw && raw.trim()) {
+          body = JSON.parse(raw);
         }
-        body = jsonObj;
-      } else {
-        return NextResponse.json({ status: 'invalid_json', error: String(parseError) }, { status: 200 });
+      } catch (e) {
+        // fall through to try formData
       }
     }
 
-    console.log('Webhook received:', JSON.stringify(body).slice(0, 500));
+    // Try formData approach
+    if (Object.keys(body).length === 0) {
+      try {
+        const formData = await request.formData();
+        formData.forEach((value, key) => {
+          body[key] = value;
+        });
+      } catch {
+        // fall through
+      }
+    }
+
+    console.log('Webhook body keys:', Object.keys(body), 'content-type:', contentType);
 
     // Extract message from various formats
     let from = '';
-    let text = '';
+    let msgText = '';
 
-    // Format 1: Meta Cloud API
-    const metaMsg = body?.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
-    if (metaMsg) {
-      from = metaMsg.from || '';
-      text = metaMsg.text?.body || '';
-    }
-    // Format 2: WATI standard
-    else if (body.from && (body.text || body.body)) {
+    // WATI format
+    if (body.from) {
       from = body.from;
-      text = body.text || body.body || '';
-    }
-    // Format 3: WATI with waId
-    else if (body.waId || body.from || body.sender) {
-      from = body.waId || body.from || body.sender || '';
-      text = body.text?.body || body.body || body.text || body.message || '';
-    }
-    // Format 4: messages array
-    else if (body.messages && Array.isArray(body.messages) && body.messages[0]) {
-      const msg = body.messages[0];
-      from = msg.from || msg.waId || '';
-      text = msg.text?.body || msg.body || msg.text || '';
+      msgText = body.text || body.body || body.message || '';
     }
 
-    if (!from) from = '';
-    if (!text) text = '';
+    // WATI with waId
+    if (!from && body.waId) {
+      from = body.waId;
+      msgText = body.text || body.body || '';
+    }
 
-    from = from.replace(/[^0-9]/g, '');
+    // Meta Cloud API
+    const metaMsg = body.entry?.[0]?.changes?.[0]?.value?.messages?.[0];
+    if (metaMsg) {
+      from = metaMsg.from || from;
+      msgText = metaMsg.text?.body || msgText;
+    }
 
-    if (!text || !from) {
-      console.log('Could not extract message, body keys:', Object.keys(body));
+    // messages array format
+    if (!from && body.messages && body.messages[0]) {
+      from = body.messages[0].from || '';
+      msgText = body.messages[0].text?.body || body.messages[0].text || '';
+    }
+
+    // Fallback: check all possible fields
+    if (!from) {
+      from = body.sender || body.phone || body.waId || '';
+    }
+    if (!msgText) {
+      msgText = body.message || body.content || body.body || '';
+    }
+
+    from = (from || '').replace(/[^0-9]/g, '');
+
+    if (!msgText || !from) {
+      console.log('Could not extract message from body');
       return NextResponse.json({ status: 'no_message' }, { status: 200 });
     }
 
-    console.log(`Processing: from=${from}, text=${text}`);
+    console.log(`Processing: from=${from}, text=${msgText}`);
 
-    const intent = await detectIntent(text);
+    const intent = await detectIntent(msgText);
     let reply: string;
 
     if (intent.action === 'order') {
       try {
-        const orderResult = await detectAndCreateOrder(text, from);
+        const orderResult = await detectAndCreateOrder(msgText, from);
         if (orderResult.success) {
           const items = orderResult.items || [];
           const total = orderResult.totalPrice || 0;
@@ -123,14 +117,14 @@ export async function POST(request: NextRequest) {
         } else if (orderResult.needsClarification) {
           reply = orderResult.clarificationMessage || 'What would you like to order?';
         } else {
-          reply = await generateReply(text, intent);
+          reply = await generateReply(msgText, intent);
         }
       } catch (orderErr) {
         console.error('Order processing failed, falling back to RAG:', orderErr);
-        reply = await generateReply(text, intent);
+        reply = await generateReply(msgText, intent);
       }
     } else {
-      reply = await generateReply(text, intent);
+      reply = await generateReply(msgText, intent);
     }
 
     await sendWhatsAppMessage(from, reply);
