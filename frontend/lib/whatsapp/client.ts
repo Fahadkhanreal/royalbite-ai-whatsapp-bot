@@ -5,7 +5,7 @@
 import { env } from '@/lib/env';
 import { WhatsAppError } from '@/lib/errors';
 
-const WATI_BASE_URL = 'https://api.wati.io/api/v1';
+const WATI_BASE_URL = 'https://live-mt-server.wati.io/10180462';
 
 interface WhatsAppResponse {
   success: boolean;
@@ -23,7 +23,7 @@ export async function sendWhatsAppMessage(
   try {
     const formattedNumber = to.replace(/[^0-9]/g, '');
 
-    const response = await fetch(`${WATI_BASE_URL}/sendSessionMessage/${formattedNumber}`, {
+    const response = await fetch(`${WATI_BASE_URL}/api/v1/sendSessionMessage/${formattedNumber}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${env.WHATSAPP_API_TOKEN}`,
@@ -64,7 +64,7 @@ export async function sendWhatsAppAudio(
   try {
     const formattedNumber = to.replace(/[^0-9]/g, '');
 
-    const response = await fetch(`${WATI_BASE_URL}/sendSessionMessage/${formattedNumber}`, {
+    const response = await fetch(`${WATI_BASE_URL}/api/v1/sendSessionMessage/${formattedNumber}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${env.WHATSAPP_API_TOKEN}`,
