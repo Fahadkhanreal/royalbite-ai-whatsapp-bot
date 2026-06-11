@@ -1,38 +1,15 @@
 // WhatsApp Webhook handler (WATI compatible)
-// Location: app/api/whatsapp/webhook/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { env } from '@/lib/env';
-import { WhatsAppError } from '@/lib/errors';
-import { processIncomingMessage } from '@/lib/whatsapp/processor';
+import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
+import { generateReply } from '@/lib/whatsapp/respond';
+import { detectIntent } from '@/lib/whatsapp/intent';
 
 export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const mode = searchParams.get('hub.mode');
-    const token = searchParams.get('hub.verify_token');
-    const challenge = searchParams.get('hub.challenge');
-
-    // WATI verification — respond with challenge on any GET
-    if (challenge) {
-      console.log('WATI Webhook verified successfully');
-      return new NextResponse(challenge, { status: 200 });
-    }
-
-    // Meta-style verification
-    if (mode === 'subscribe' && token === env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
-      return new NextResponse(challenge || 'verified', { status: 200 });
-    }
-
-    // If no challenge but verification token matches
-    if (token === env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
-      return new NextResponse('verified', { status: 200 });
-    }
-
-    // Fallback — always return 200 for WATI
-    return new NextResponse('ok', { status: 200 });
-  } catch (error) {
-    return new NextResponse('ok', { status: 200 });
-  }
+  const { searchParams } = new URL(request.url);
+  const challenge = searchParams.get('hub.challenge');
+  // Always respond ok for WATI verification
+  return new NextResponse(challenge || 'ok', { status: 200 });
 }
 
 export async function POST(request: NextRequest) {
@@ -40,60 +17,54 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('WATI webhook received:', JSON.stringify(body));
 
-    // WATI can send different formats:
-    // 1. { id, from, text, timestamp } — single message
-    // 2. [{...}] — array of messages
-    // 3. { messages: [{...}] } — wrapped in messages key
-    // 4. { entry: [{ changes: [{ value: { messages: [...] } }] }] } — Meta format
+    // Extract message from various WATI formats
+    let from = '';
+    let text = '';
 
-    let messages: any[] = [];
+    // Format 1: { id, from, text, timestamp }
+    if (body.from && body.text) {
+      from = body.from;
+      text = body.text;
+    }
+    // Format 2: { messages: [{ from, text }] }
+    else if (body.messages?.[0]) {
+      from = body.messages[0].from || body.messages[0].waId || '';
+      text = body.messages[0].text?.body || body.messages[0].text || body.messages[0].body || '';
+    }
+    // Format 3: Array
+    else if (Array.isArray(body) && body[0]) {
+      from = body[0].from || '';
+      text = body[0].text || '';
+    }
+    // Format 4: { body: "...", from: "..." }
+    else if (body.body) {
+      text = body.body;
+      from = body.from || body.waId || '';
+    }
 
-    if (body.messages && Array.isArray(body.messages)) {
-      // WATI bulk format
-      messages = body.messages;
-    } else if (body.entry?.[0]?.changes?.[0]?.value?.messages) {
-      // Meta format (backward compat)
-      messages = body.entry[0].changes[0].value.messages;
-    } else if (Array.isArray(body)) {
-      messages = body;
-    } else if (body.id && (body.text || body.body)) {
-      messages = [body];
-    } else {
-      // Unknown format — just ack
+    if (!text || !from) {
       return NextResponse.json({ status: 'no_message' }, { status: 200 });
     }
 
-    const results = await Promise.allSettled(
-      messages.map((msg: any) => {
-        // Extract text from various formats
-        const text = msg.text?.body || msg.text || msg.body || '';
-        const from = msg.from || msg.waId || '';
+    // Clean phone number
+    from = from.replace(/[^0-9]/g, '');
+    if (!from.startsWith('92')) from = '92' + from;
 
-        const internalMsg = {
-          from,
-          id: msg.id || 'unknown',
-          timestamp: msg.timestamp || String(Date.now()),
-          text: { body: text },
-          type: 'text',
-        };
-        const metadata = {
-          phone_number_id: from,
-          display_phone_number: from,
-        };
-        return processIncomingMessage(internalMsg, metadata);
-      })
-    );
+    console.log(`Processing: from=${from}, text=${text}`);
 
-    // Log results
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        console.error('Message processing failed:', result.reason);
-      }
-    }
+    // Intent detection
+    const intent = await detectIntent(text);
 
-    return NextResponse.json({ status: 'ok', processed: messages.length }, { status: 200 });
-  } catch (error) {
-    console.error('WATI webhook error:', error);
-    return NextResponse.json({ status: 'acknowledged' }, { status: 200 });
+    // Generate reply (handles greeting, help, order, and RAG + Groq)
+    const reply = await generateReply(text, intent);
+
+    // Send reply via WATI
+    await sendWhatsAppMessage(from, reply);
+
+    console.log(`Reply sent to ${from}: ${reply.substring(0, 50)}...`);
+    return NextResponse.json({ status: 'ok', reply_sent: true }, { status: 200 });
+  } catch (error: any) {
+    console.error('Webhook error:', error?.message || error);
+    return NextResponse.json({ status: 'error', error: String(error) }, { status: 200 });
   }
 }
