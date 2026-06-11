@@ -12,14 +12,26 @@ export async function GET(request: NextRequest) {
     const token = searchParams.get('hub.verify_token');
     const challenge = searchParams.get('hub.challenge');
 
-    if (mode === 'subscribe' && token === env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
+    // WATI verification — respond with challenge on any GET
+    if (challenge) {
       console.log('WATI Webhook verified successfully');
       return new NextResponse(challenge, { status: 200 });
     }
 
-    return NextResponse.json({ error: 'Verification failed' }, { status: 403 });
+    // Meta-style verification
+    if (mode === 'subscribe' && token === env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
+      return new NextResponse(challenge || 'verified', { status: 200 });
+    }
+
+    // If no challenge but verification token matches
+    if (token === env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
+      return new NextResponse('verified', { status: 200 });
+    }
+
+    // Fallback — always return 200 for WATI
+    return new NextResponse('ok', { status: 200 });
   } catch (error) {
-    return NextResponse.json({ error: 'Verification error' }, { status: 500 });
+    return new NextResponse('ok', { status: 200 });
   }
 }
 
