@@ -1,10 +1,11 @@
-// WhatsApp Webhook - Pure WATI handler
+// WhatsApp Webhook - WATI handler v2.1
 import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
 import { generateReply } from '@/lib/whatsapp/respond';
 import { detectIntent } from '@/lib/whatsapp/intent';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const maxDuration = 30; // Force new deployment
 
 export async function GET() {
   return new Response(JSON.stringify({ status: 'ok' }), {
