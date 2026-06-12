@@ -19,6 +19,14 @@ export async function generateResponse(
   maxTokens: number = 1024
 ): Promise<string> {
   try {
+    console.info('[GROQ] Starting request:', {
+      model: env.GROQ_MODEL,
+      hasApiKey: Boolean(env.GROQ_API_KEY),
+      apiKeyPrefix: env.GROQ_API_KEY ? env.GROQ_API_KEY.slice(0, 10) : 'MISSING',
+      maxTokens,
+      temperature,
+    });
+
     const completion = await groq.chat.completions.create({
       model: env.GROQ_MODEL,
       max_tokens: maxTokens,
@@ -35,14 +43,33 @@ export async function generateResponse(
       ],
     });
 
+    console.info('[GROQ] Response received:', {
+      hasChoices: Boolean(completion.choices?.length),
+      choicesCount: completion.choices?.length || 0,
+      firstChoiceHasMessage: Boolean(completion.choices?.[0]?.message),
+      firstChoiceHasContent: Boolean(completion.choices?.[0]?.message?.content),
+    });
+
     const content = completion.choices[0]?.message?.content;
     if (!content) {
+      console.error('[GROQ] CRITICAL: Empty content from Groq!', {
+        completion: JSON.stringify(completion).slice(0, 500),
+      });
       throw new Error('Empty response from Groq');
     }
 
+    console.info('[GROQ] Success:', {
+      contentLength: content.length,
+      contentPreview: content.slice(0, 100),
+    });
+
     return content;
   } catch (error) {
-    console.error('Groq API error:', error);
+    console.error('[GROQ] API error:', {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack?.slice(0, 300) : undefined,
+      apiKeySet: Boolean(env.GROQ_API_KEY),
+    });
     throw error;
   }
 }

@@ -88,9 +88,17 @@ export async function generateReply(
     const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 300);
 
     console.info('[Groq] Response generated:', {
-      replyLength: reply.length,
+      replyLength: reply?.length || 0,
+      replyType: typeof reply,
+      replyValue: reply ? reply.slice(0, 100) : 'NULL_OR_UNDEFINED',
       query: userMessage.slice(0, 50),
     });
+
+    // CRITICAL: Never return empty
+    if (!reply || reply.trim().length === 0) {
+      console.error('[GROQ] CRITICAL: Groq returned empty despite no error thrown!');
+      return `Thank you for your message! Our team is currently reviewing it and will get back to you shortly. For immediate assistance, you can call us directly.`;
+    }
 
     return reply;
   } catch (error) {
