@@ -161,10 +161,33 @@ export async function POST(req: Request) {
     console.info('[WEBHOOK] Intent detected:', intent);
 
     const reply = await generateReply(msgText, intent);
+
     console.info('[WEBHOOK] Reply generated:', {
-      replyLength: reply.length,
-      replyPreview: reply.slice(0, 100),
+      replyLength: reply?.length || 0,
+      replyPreview: reply ? reply.slice(0, 100) : 'EMPTY OR UNDEFINED!',
+      replyType: typeof reply,
+      replyTruthy: Boolean(reply),
     });
+
+    if (!reply || reply.trim().length === 0) {
+      console.error('[WEBHOOK] CRITICAL: generateReply returned empty!', {
+        query: msgText,
+        intent: intent.action,
+        replyValue: reply,
+      });
+      // Send fallback message
+      const fallbackMsg = 'Thanks for your message! Our team will respond shortly. For urgent queries, please call us.';
+      await sendWhatsAppMessage(from, fallbackMsg);
+
+      return new Response(JSON.stringify({
+        status: 'ok',
+        reply_sent: true,
+        warning: 'Used fallback message'
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
 
     await sendWhatsAppMessage(from, reply);
     console.info('[WEBHOOK] Message sent successfully to:', `${from.slice(0, 6)}xxx`);
