@@ -1,4 +1,6 @@
-// WhatsApp Webhook - WATI handler v2.1
+// WhatsApp Webhook - WATI handler v3.0
+// Force rebuild: 2026-06-13T02:35:00Z
+// This file MUST generate a new webpack hash
 import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
 import { generateReply } from '@/lib/whatsapp/respond';
 import { detectIntent } from '@/lib/whatsapp/intent';
