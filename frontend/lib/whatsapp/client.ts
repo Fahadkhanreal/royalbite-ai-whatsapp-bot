@@ -35,9 +35,15 @@ export async function sendWhatsAppMessage(to: string, text: string): Promise<Wha
     throw new WhatsAppError('message text can not be empty');
   }
 
-  const payload = { messageText: text.trim() };
+  const messageText = text.trim();
+  const payload = { messageText };
 
-  console.info('[WATI] Sending payload:', JSON.stringify(payload).slice(0, 200));
+  console.info('[WATI] Sending payload:', {
+    payload: JSON.stringify(payload),
+    payloadKeys: Object.keys(payload),
+    messageTextLength: messageText.length,
+    messageTextType: typeof messageText,
+  });
 
   const response = await fetch(
     `${WATI_BASE_URL}/api/v1/sendSessionMessage/${formattedNumber}`,
@@ -64,12 +70,21 @@ export async function sendWhatsAppMessage(to: string, text: string): Promise<Wha
   }
 
   if (!response.ok || !data.result) {
-    console.error('[WATI] Send error:', {
+    console.error('[WATI] Send failed - API rejected message:', {
       status: response.status,
       to: `${formattedNumber.slice(0, 6)}xxx`,
-      info: data.info,
-      response: data,
-      responseText: responseText.slice(0, 200),
+      errorInfo: data.info,
+      sentPayload: JSON.stringify(payload),
+      sentTextLength: messageText.length,
+      sentTextPreview: messageText.slice(0, 100),
+      responseData: data,
+      responseText: responseText.slice(0, 300),
+      possibleReasons: [
+        'Session expired (24hr window)',
+        'Chat assigned to wrong inbox',
+        'WhatsApp API restriction',
+        'WATI account issue'
+      ]
     });
     throw new WhatsAppError(data.info || `WATI send failed with status ${response.status}`);
   }
