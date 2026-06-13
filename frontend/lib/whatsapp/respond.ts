@@ -84,8 +84,8 @@ export async function generateReply(
 
     console.info('[Groq] Generating response with context length:', contextText.length);
 
-    // Generate response using Groq
-    const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 300);
+    // Generate response using Groq (increased maxTokens from 300 to 800 for better responses)
+    const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 800);
 
     console.info('[Groq] Response generated:', {
       replyLength: reply?.length || 0,

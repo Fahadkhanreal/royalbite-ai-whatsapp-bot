@@ -51,11 +51,24 @@ export async function generateResponse(
     });
 
     const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      console.error('[GROQ] CRITICAL: Empty content from Groq!', {
+
+    console.info('[GROQ] Raw response analysis:', {
+      hasContent: Boolean(content),
+      contentType: typeof content,
+      contentValue: content,
+      contentLength: content?.length || 0,
+      completionKeys: Object.keys(completion),
+      choicesLength: completion.choices?.length,
+      finishReason: completion.choices?.[0]?.finish_reason,
+    });
+
+    if (!content || content.trim().length === 0) {
+      console.error('[GROQ] CRITICAL: Empty or whitespace-only content from Groq!', {
+        contentValue: JSON.stringify(content),
         completion: JSON.stringify(completion).slice(0, 500),
+        finishReason: completion.choices?.[0]?.finish_reason,
       });
-      throw new Error('Empty response from Groq');
+      throw new Error('Empty response from Groq - content is null or empty string');
     }
 
     console.info('[GROQ] Success:', {
@@ -63,7 +76,7 @@ export async function generateResponse(
       contentPreview: content.slice(0, 100),
     });
 
-    return content;
+    return content.trim();
   } catch (error) {
     console.error('[GROQ] API error:', {
       error: error instanceof Error ? error.message : String(error),
