@@ -44,7 +44,8 @@ const menuChunks = [
 for (const chunk of menuChunks) {
   const embedding = hashEmbedding(chunk.content);
   const metadata = { type: chunk.type, category: chunk.type === "menu" ? "complete-menu" : "general-faq" };
-  await sql`INSERT INTO documents (content, embedding, metadata, source) VALUES (${chunk.content}, ${JSON.stringify(embedding)}::vector, ${JSON.stringify(metadata)}, ${'seed_data'})`;
+  const source = chunk.type; // Use 'menu' for menu items, 'faq' for FAQs
+  await sql`INSERT INTO documents (content, embedding, metadata, source) VALUES (${chunk.content}, ${JSON.stringify(embedding)}::vector, ${JSON.stringify(metadata)}, ${source})`;
   console.log(`✓ Inserted: ${chunk.content.substring(0, 50)}...`);
 }
 

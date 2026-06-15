@@ -65,9 +65,21 @@ export async function generateReply(
   intent: IntentResult
 ): Promise<string> {
   try {
-    // Handle greetings separately
+    // Handle greetings with VARIETY (not hardcoded same response)
     if (intent.action === 'greeting') {
-      return `${getGreetingResponse()}! Welcome to RoyalBite! How can I help you today? You can ask about our menu, timings, or place an order!`;
+      const greetingVariations = [
+        `${getGreetingResponse()}! RoyalBite mein aapka swagat hai 🍽️ Main aapki kya madad kar sakta hoon?`,
+        `Salam! Welcome to RoyalBite 😊 Menu, timings ya order - kuch bhi poochein!`,
+        `${getGreetingResponse()}! Kaisi hain aap? Main RoyalBite ka assistant hoon. Kya jaanna chahte hain?`,
+        `Hello! RoyalBite ke menu, delivery ya timings ke baare mein kuch puchhna hai? 🍛`,
+        `${getGreetingResponse()} RoyalBite pe aapka swagat hai! Kaise madad kar sakta hoon aaj?`,
+        `Assalam o alaikum! Main aapko RoyalBite ke menu aur orders mein madad kar sakta hoon 👋`,
+        `Hi there! Kya aap hamara menu dekhna chahte hain ya order dena? 🤗`,
+        `${getGreetingResponse()}! Welcome back to RoyalBite. Aaj kya order karna hai?`,
+      ];
+      // Pick random greeting each time
+      const randomGreeting = greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
+      return randomGreeting;
     }
 
     if (intent.action === 'thanks') {
