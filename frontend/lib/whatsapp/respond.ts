@@ -69,7 +69,33 @@ export async function generateReply(
       return getHelpResponse();
     }
 
-    // Search RAG for relevant context
+    // SPECIAL CASE: For menu queries, fetch ALL menu items (not search-based)
+    if (intent.action === 'menu_query') {
+      console.info('[RAG] Menu query detected - fetching ALL menu items');
+      const allMenuItems = await db.query.documents.findMany({
+        where: (docs, { eq }) => eq(docs.source, 'menu'),
+      });
+
+      const menuContext = allMenuItems.map(item => item.content).join('\n\n');
+
+      if (menuContext) {
+        const context = `RoyalBite Menu (complete list):\n${menuContext}\n\nUser question: ${userMessage}`;
+        console.info('[RAG] Menu context loaded:', {
+          totalItems: allMenuItems.length,
+          contextLength: menuContext.length,
+        });
+        const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 800);
+
+        if (!reply || reply.trim().length === 0) {
+          console.error('[Groq] CRITICAL: Groq returned empty despite no error thrown!');
+          return `Thank you for your message! Our team is currently reviewing it and will respond shortly. You can also call us for immediate assistance!`;
+        }
+
+        return reply;
+      }
+    }
+
+    // For other queries, use search
     const searchResult = await hybridSearch(userMessage, {
       limit: 3,
       minSimilarity: 0.25, // Lowered from 0.4 for hash-based embeddings
