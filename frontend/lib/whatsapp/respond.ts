@@ -5,6 +5,7 @@
 import { generateResponse } from '@/lib/groq/client';
 import { hybridSearch } from '@/lib/rag/search';
 import { getGreetingResponse, IntentResult } from './intent';
+import { db } from '@/lib/db';
 
 // System prompt for the RoyalBite WhatsApp bot
 const SYSTEM_PROMPT = `You are a friendly and helpful WhatsApp assistant for RoyalBite Restaurant.
