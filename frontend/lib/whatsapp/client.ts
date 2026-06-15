@@ -69,3 +69,55 @@ export async function sendWhatsAppMessage(to: string, text: string) {
   console.info('[GREEN-API] Message sent successfully to', chatId);
   return data;
 }
+
+/**
+ * Send audio file to WhatsApp via Green API
+ * @param to - Phone number (e.g., "923482240731")
+ * @param audioUrl - Public URL of audio file
+ */
+export async function sendWhatsAppAudio(to: string, audioUrl: string) {
+  if (!GREEN_API_INSTANCE_ID || !GREEN_API_TOKEN) {
+    throw new Error('GREEN_API_INSTANCE_ID or GREEN_API_TOKEN environment variable is not set');
+  }
+
+  // Green API requires chatId in format: "923482240731@c.us"
+  const chatId = to.includes('@') ? to : `${to}@c.us`;
+
+  const payload = {
+    chatId: chatId,
+    urlFile: audioUrl,
+    fileName: 'voice-message.ogg',
+    caption: ''
+  };
+
+  console.info('[GREEN-API] Sending audio:', {
+    chatId: chatId,
+    audioUrl: audioUrl.slice(0, 100),
+  });
+
+  const response = await fetch(`${GREEN_API_URL}/sendFileByUrl/${GREEN_API_TOKEN}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+
+  console.info('[GREEN-API] Audio response:', {
+    status: response.status,
+    ok: response.ok,
+  });
+
+  if (!response.ok) {
+    console.error('[GREEN-API] Audio send failed:', {
+      status: response.status,
+      errorData: JSON.stringify(data),
+    });
+    throw new Error(`Green API audio error: ${response.statusText}`);
+  }
+
+  console.info('[GREEN-API] Audio sent successfully to', chatId);
+  return data;
+}
