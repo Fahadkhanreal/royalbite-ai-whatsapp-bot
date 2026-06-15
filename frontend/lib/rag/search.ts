@@ -66,7 +66,7 @@ export async function searchDocuments(
     }
 
     paramIdx++;
-    const similarityThreshold = opts.minSimilarity ?? 0.5;
+    const similarityThreshold = opts.minSimilarity ?? 0.1;
     conditions.push(`1 - (embedding <=> $${paramIdx}::vector) >= ${similarityThreshold}`);
     params.push(vectorStr);
 
@@ -95,6 +95,12 @@ export async function searchDocuments(
       documentId: row.id,
     }));
 
+    // CRITICAL: If vector search returns 0 results, fall back to keyword search
+    if (searchResults.length === 0) {
+      console.warn('[RAG] Vector search returned 0 results, falling back to keyword search');
+      return keywordSearch(query, opts);
+    }
+
     return {
       results: searchResults,
       query,
@@ -102,7 +108,7 @@ export async function searchDocuments(
       tookMs: Date.now() - startTime,
     };
   } catch (error) {
-    console.warn('Vector search failed, falling back to keyword search:', error);
+    console.warn('[RAG] Vector search failed with error, falling back to keyword search:', error);
     return keywordSearch(query, opts);
   }
 }
