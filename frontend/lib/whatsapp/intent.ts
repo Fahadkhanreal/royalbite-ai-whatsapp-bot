@@ -18,10 +18,14 @@ export interface IntentResult {
 // Keyword maps for each intent
 const INTENT_KEYWORDS: Record<IntentAction, string[]> = {
   menu_query: [
+    // English keywords
     'menu', 'dish', 'food', 'eat', 'biryani', 'karahi', 'nihari', 'kebab', 'paratha',
     'dessert', 'kheer', 'curry', 'rice', 'bread', 'chicken', 'mutton', 'beef',
     'vegetarian', 'vegan', 'spicy', 'what do you have', 'available', 'serving',
     'recommend', 'special', 'signature', 'halal',
+    // Roman Urdu keywords
+    'kya', 'hai', 'ha', 'batao', 'batio', 'dikhao', 'dikha', 'sara', 'sab', 'poora',
+    'complete', 'puri', 'list', 'items', 'konsa', 'kaunsa', 'milta', 'milti',
   ],
   order: [
     'order', 'want', 'buy', 'get', 'deliver', 'send', 'book', 'place',

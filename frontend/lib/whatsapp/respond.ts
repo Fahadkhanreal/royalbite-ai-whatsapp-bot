@@ -36,6 +36,14 @@ CRITICAL CONTEXT RULE:
 - DO NOT say "I don't have information" if the context contains relevant data
 - ONLY say you don't know if the context truly doesn't contain the answer
 
+CRITICAL MENU DISPLAY RULE:
+- When user asks for "sara menu", "poora menu", "complete menu", "sab menu", "full menu", or similar:
+  * Show ALL menu items from the context
+  * Group by category (Biryanis, Main Dishes, Breads, Desserts, Drinks)
+  * Include prices for EVERY item
+  * DO NOT summarize or show only 2-3 items
+  * Show the COMPLETE list
+
 Guidelines:
 1. If asked about menu items, describe them appetizingly using the context
 2. For price inquiries, mention prices from the context
@@ -85,7 +93,7 @@ export async function generateReply(
           totalItems: allMenuItems.length,
           contextLength: menuContext.length,
         });
-        const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 800);
+        const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 1200);
 
         if (!reply || reply.trim().length === 0) {
           console.error('[Groq] CRITICAL: Groq returned empty despite no error thrown!');
