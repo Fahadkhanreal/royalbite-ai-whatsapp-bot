@@ -34,7 +34,7 @@ export interface SearchResponse {
 
 const DEFAULT_OPTIONS: SearchOptions = {
   limit: 3,
-  minSimilarity: 0.5,
+  minSimilarity: 0.1, // Lowered from 0.5 for hash embedding compatibility
 };
 
 /**
