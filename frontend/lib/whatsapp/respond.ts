@@ -108,30 +108,54 @@ export async function generateReply(
       return getHelpResponse();
     }
 
-    // SPECIAL CASE: For menu queries, fetch ALL menu items (not search-based)
+    // SPECIAL CASE: For menu queries, fetch from ADMIN MENU (dishes table)
     if (intent.action === 'menu_query') {
-      console.info('[RAG] Menu query detected - fetching ALL menu items');
-      const allMenuItems = await db.query.documents.findMany({
-        where: (docs, { eq }) => eq(docs.source, 'menu'),
+      console.info('[RAG] Menu query detected - fetching from admin menu (dishes table)');
+
+      // Fetch actual menu items from dishes table (admin-managed)
+      const menuItems = await db.query.dishes.findMany({
+        where: (dishes, { eq }) => eq(dishes.isAvailable, true),
+        orderBy: (dishes, { asc }) => [asc(dishes.category)],
       });
 
-      const menuContext = allMenuItems.map(item => item.content).join('\n\n');
-
-      if (menuContext) {
-        const context = `RoyalBite Menu (complete list):\n${menuContext}\n\nUser question: ${userMessage}`;
-        console.info('[RAG] Menu context loaded:', {
-          totalItems: allMenuItems.length,
-          contextLength: menuContext.length,
-        });
-        const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 1200);
-
-        if (!reply || reply.trim().length === 0) {
-          console.error('[Groq] CRITICAL: Groq returned empty despite no error thrown!');
-          return `Thank you for your message! Our team is currently reviewing it and will respond shortly. You can also call us for immediate assistance!`;
-        }
-
-        return reply;
+      if (menuItems.length === 0) {
+        return `I'm sorry, our menu is being updated right now. Please check back in a few minutes or call us directly!`;
       }
+
+      // Format menu items by category
+      const menuByCategory: Record<string, any[]> = {};
+      menuItems.forEach(item => {
+        const category = item.category || 'Other';
+        if (!menuByCategory[category]) {
+          menuByCategory[category] = [];
+        }
+        menuByCategory[category].push(item);
+      });
+
+      // Build menu context
+      let menuContext = 'RoyalBite Menu (Current Items):\n\n';
+      for (const [category, items] of Object.entries(menuByCategory)) {
+        menuContext += `${category}:\n`;
+        items.forEach(item => {
+          menuContext += `- ${item.name}: ${item.description || 'Delicious dish'}. Price: Rs. ${item.price}\n`;
+        });
+        menuContext += '\n';
+      }
+
+      const context = `${menuContext}\n\nUser question: ${userMessage}`;
+      console.info('[RAG] Menu context loaded from dishes table:', {
+        totalItems: menuItems.length,
+        categories: Object.keys(menuByCategory),
+      });
+
+      const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 1200);
+
+      if (!reply || reply.trim().length === 0) {
+        console.error('[Groq] CRITICAL: Groq returned empty despite no error thrown!');
+        return `Thank you for your message! Our team is currently reviewing it and will respond shortly. You can also call us for immediate assistance!`;
+      }
+
+      return reply;
     }
 
     // For other queries, use search + knowledge base

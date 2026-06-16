@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { FileText, X } from "lucide-react"
+import { FileText } from "lucide-react"
 
 interface DocumentPreviewDialogProps {
   open: boolean
@@ -18,17 +18,9 @@ export function DocumentPreviewDialog({ open, onOpenChange, document }: Document
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[80vh]" style={{ background: "rgba(20,15,12,0.95)", border: "1px solid rgba(201,162,39,0.2)" }}>
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle style={{ color: "#F8F5F0", fontFamily: "Playfair Display" }}>
-              Document Preview
-            </DialogTitle>
-            <button
-              onClick={() => onOpenChange(false)}
-              className="rounded-lg p-1 hover:bg-[rgba(239,68,68,0.1)]"
-            >
-              <X className="size-4" style={{ color: "#EF4444" }} />
-            </button>
-          </div>
+          <DialogTitle style={{ color: "#F8F5F0", fontFamily: "Playfair Display" }}>
+            Document Preview
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">

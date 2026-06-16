@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import { detectIntent } from '@/lib/whatsapp/intent';
 import { generateReply } from '@/lib/whatsapp/respond';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
+import { isInCooldown, recordResponse, getCooldownRemaining } from '@/lib/whatsapp/cooldown';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -93,6 +94,23 @@ export async function POST(req: Request) {
     const intent = await detectIntent(msgText);
     console.info('[WEBHOOK-V3] Intent detected:', intent);
 
+    // Check cooldown to prevent duplicate responses
+    if (isInCooldown(from, intent.action)) {
+      const remaining = getCooldownRemaining(from, intent.action);
+      console.info('[WEBHOOK-V3] ⏱️ User in cooldown for intent:', {
+        user: from,
+        intent: intent.action,
+        remainingSeconds: remaining,
+        message: 'Skipping duplicate response'
+      });
+      return NextResponse.json({
+        status: 'cooldown',
+        intent: intent.action,
+        remainingSeconds: remaining,
+        message: 'Duplicate intent within cooldown period'
+      });
+    }
+
     // Generate reply using RAG + Groq
     console.info('[WEBHOOK-V3] Generating reply via RAG + Groq...');
     const reply = await generateReply(msgText, intent);
@@ -110,6 +128,9 @@ export async function POST(req: Request) {
     // Send reply back via Green API
     console.info('[WEBHOOK-V3] Sending reply to', from);
     await sendWhatsAppMessage(from, finalReply);
+
+    // Record response to activate cooldown
+    recordResponse(from, intent.action);
 
     console.info('[WEBHOOK-V3] ✅ Reply sent successfully!');
     return NextResponse.json({
