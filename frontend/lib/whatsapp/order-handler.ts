@@ -3,7 +3,8 @@
 // Handles order creation and processing
 
 import { db } from '@/lib/db';
-import { orders, orderItems } from '@/lib/db/schema';
+import { orders, orderItems, dishes } from '@/lib/db/schema';
+import { eq, ilike } from 'drizzle-orm';
 
 export interface OrderDetails {
   items: Array<{
@@ -88,7 +89,7 @@ export function extractOrderDetails(message: string, menuContext?: string): {
 }
 
 /**
- * Create order in database
+ * Create order in database with order items
  */
 export async function createOrder(details: OrderDetails): Promise<{
   orderId: string;
@@ -99,7 +100,7 @@ export async function createOrder(details: OrderDetails): Promise<{
     // Calculate total
     const total = details.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-    // Create order
+    // Create order first
     const [order] = await db.insert(orders).values({
       phoneNumber: details.phoneNumber,
       totalPrice: total.toString(),
@@ -107,9 +108,35 @@ export async function createOrder(details: OrderDetails): Promise<{
       specialInstructions: details.specialInstructions || null,
     }).returning();
 
-    // Create order items (if we have dish IDs, we'd link them here)
-    // For now, we'll store in special instructions or a separate field
-    // In a full implementation, you'd match items to dishes and create orderItems entries
+    // Create order items - match each item to a dish if possible
+    for (const item of details.items) {
+      // Try to find matching dish in database
+      const dish = await db.query.dishes.findFirst({
+        where: (dishes, { ilike }) => ilike(dishes.name, `%${item.name}%`),
+      });
+
+      if (dish) {
+        // Dish found - create order item with dish reference
+        await db.insert(orderItems).values({
+          orderId: order.id,
+          dishId: dish.id,
+          quantity: item.quantity,
+          priceAtOrder: item.price.toString(),
+        });
+      } else {
+        // Dish not found - store as special instruction for now
+        // In production, you might want to create a separate "custom items" table
+        const currentInstructions = order.specialInstructions || '';
+        const itemDetail = `${item.quantity}x ${item.name} @ Rs. ${item.price}`;
+        await db.update(orders)
+          .set({
+            specialInstructions: currentInstructions
+              ? `${currentInstructions}; ${itemDetail}`
+              : itemDetail,
+          })
+          .where(eq(orders.id, order.id));
+      }
+    }
 
     // Generate order number (last 6 chars of UUID)
     const orderNumber = order.id.slice(-6).toUpperCase();
