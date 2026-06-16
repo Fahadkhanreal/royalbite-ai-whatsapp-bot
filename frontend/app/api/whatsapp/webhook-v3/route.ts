@@ -113,7 +113,7 @@ export async function POST(req: Request) {
 
     // Generate reply using RAG + Groq
     console.info('[WEBHOOK-V3] Generating reply via RAG + Groq...');
-    const reply = await generateReply(msgText, intent);
+    const reply = await generateReply(msgText, intent, from);
 
     // Fallback if reply is empty (should never happen with our safeguards)
     const finalReply = reply && reply.trim().length > 0

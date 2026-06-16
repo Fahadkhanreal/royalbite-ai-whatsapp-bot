@@ -6,6 +6,8 @@ import { generateResponse } from '@/lib/groq/client';
 import { hybridSearch } from '@/lib/rag/search';
 import { getGreetingResponse, IntentResult } from './intent';
 import { db } from '@/lib/db';
+import { getConversationState, setConversationState, clearConversationState } from './conversation-state';
+import { extractOrderDetails, createOrder, formatOrderConfirmation } from './order-handler';
 
 // System prompt for the RoyalBite WhatsApp bot
 const SYSTEM_PROMPT = `You are a friendly and helpful WhatsApp assistant for RoyalBite Restaurant.
@@ -80,9 +82,125 @@ Response format:
  */
 export async function generateReply(
   userMessage: string,
-  intent: IntentResult
+  intent: IntentResult,
+  userId?: string
 ): Promise<string> {
   try {
+    // Extract userId from phone number (will be passed from webhook)
+    const conversationUserId = userId || 'unknown';
+
+    // Check if user is in middle of an order flow
+    const conversationState = getConversationState(conversationUserId);
+
+    if (conversationState?.state === 'awaiting_order_details') {
+      // User is providing order details
+      const extracted = extractOrderDetails(userMessage);
+
+      if (extracted.hasAllDetails) {
+        // All details present, create order
+        try {
+          // Get item details from context (simplified - match by name)
+          const itemName = extracted.items[0]; // First matched item
+          const quantity = extracted.quantity || 1;
+
+          // Fetch item price (check admin menu first, then documents)
+          const dishMatch = await db.query.dishes.findFirst({
+            where: (dishes, { and, eq, ilike }) =>
+              and(
+                ilike(dishes.name, `%${itemName}%`),
+                eq(dishes.isAvailable, true)
+              ),
+          });
+
+          const price = dishMatch ? parseFloat(dishMatch.price) : 250; // Default fallback
+          const displayName = dishMatch ? dishMatch.name : itemName;
+
+          // Create order
+          const orderResult = await createOrder({
+            items: [{ name: displayName, quantity, price }],
+            address: extracted.address!,
+            phoneNumber: conversationUserId,
+          });
+
+          // Clear conversation state
+          clearConversationState(conversationUserId);
+
+          // Return confirmation
+          return formatOrderConfirmation(
+            orderResult.orderNumber,
+            [{ name: displayName, quantity, price }],
+            orderResult.total,
+            extracted.address!
+          );
+        } catch (error) {
+          console.error('Order creation failed:', error);
+          clearConversationState(conversationUserId);
+          return `Sorry, order create karte waqt issue aa gaya. Please try again ya call karein!`;
+        }
+      } else {
+        // Missing details, ask for them
+        const missing: string[] = [];
+        if (extracted.items.length === 0) missing.push('item name');
+        if (!extracted.quantity) missing.push('quantity');
+        if (!extracted.address) missing.push('address');
+
+        return `Thoda aur detail chahiye 😊\n\nPlease bataiye:\n${
+          missing.includes('item name') ? '- Kya order karna hai?\n' : ''
+        }${
+          missing.includes('quantity') ? '- Kitne plate/piece?\n' : ''
+        }${
+          missing.includes('address') ? '- Delivery address?\n' : ''
+        }\nExample: "2 chicken biryani, House 123 Block 5 Gulshan"`;
+      }
+    }
+
+    // Handle order intent
+    if (intent.action === 'order') {
+      const extracted = extractOrderDetails(userMessage);
+
+      if (extracted.hasAllDetails) {
+        // User provided everything in one message - process immediately
+        try {
+          const itemName = extracted.items[0];
+          const quantity = extracted.quantity || 1;
+
+          const dishMatch = await db.query.dishes.findFirst({
+            where: (dishes, { and, eq, ilike }) =>
+              and(
+                ilike(dishes.name, `%${itemName}%`),
+                eq(dishes.isAvailable, true)
+              ),
+          });
+
+          const price = dishMatch ? parseFloat(dishMatch.price) : 250;
+          const displayName = dishMatch ? dishMatch.name : itemName;
+
+          const orderResult = await createOrder({
+            items: [{ name: displayName, quantity, price }],
+            address: extracted.address!,
+            phoneNumber: conversationUserId,
+          });
+
+          return formatOrderConfirmation(
+            orderResult.orderNumber,
+            [{ name: displayName, quantity, price }],
+            orderResult.total,
+            extracted.address!
+          );
+        } catch (error) {
+          console.error('Order creation failed:', error);
+          return `Sorry, order create karte waqt issue aa gaya. Please try again!`;
+        }
+      } else {
+        // Missing details - enter conversation state and ask
+        setConversationState(conversationUserId, 'awaiting_order_details', {
+          orderedItem: extracted.items[0] || null,
+        });
+
+        return `Bilkul! Order le raha hoon 😊\n\nPlease yeh details de dijiye:\n- Kya order karna hai? (item name)\n- Kitne plate/piece?\n- Aapka delivery address?\n\nExample: "2 chicken biryani, House 123 Block 5 Gulshan"`;
+      }
+    }
+
     // Handle greetings with VARIETY (not hardcoded same response)
     if (intent.action === 'greeting') {
       const greetingVariations = [
