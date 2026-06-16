@@ -75,9 +75,27 @@ export async function GET(request: NextRequest) {
 
     const totalCount = (await db.query.orders.findMany()).length;
 
+    // Transform orders to match frontend interface
+    const transformedOrders = result.map((order: any) => ({
+      id: order.id,
+      customerName: order.phoneNumber, // Use phone as name for now
+      customerPhone: order.phoneNumber,
+      customerAddress: order.specialInstructions || '',
+      items: order.items?.map((item: any) => ({
+        menuItemId: item.dishId,
+        name: item.dish?.name || 'Unknown Item',
+        quantity: item.quantity || 1,
+        unitPrice: parseFloat(item.priceAtOrder || '0'),
+      })) || [],
+      totalAmount: parseFloat(order.totalPrice || '0'),
+      status: order.status,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+    }));
+
     return NextResponse.json(
       successResponse({
-        orders: result,
+        orders: transformedOrders,
         pagination: { total: totalCount, limit, offset },
       })
     );

@@ -165,11 +165,11 @@ export async function generateReply(
         const orderNumber = orderNumberMatch[0].toUpperCase();
 
         try {
-          // Find order by last 6 chars of ID
+          // Find order by last 6 chars of ID (case-insensitive)
           const order = await db.query.orders.findFirst({
-            where: (orders, { and, eq, like }) =>
+            where: (orders, { and, eq, ilike }) =>
               and(
-                like(orders.id, `%${orderNumber}`),
+                ilike(orders.id, `%${orderNumber.toLowerCase()}`),
                 eq(orders.phoneNumber, conversationUserId)
               ),
           });

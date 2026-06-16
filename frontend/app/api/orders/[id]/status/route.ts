@@ -63,8 +63,8 @@ export async function PUT(
 
     // Build update with timestamps
     const updateData: Record<string, any> = { status };
-    if (status === 'confirmed') updateData.confirmedAt = new Date().toISOString();
-    if (status === 'delivered') updateData.deliveredAt = new Date().toISOString();
+    if (status === 'confirmed') updateData.confirmedAt = new Date();
+    if (status === 'delivered') updateData.deliveredAt = new Date();
 
     // Update order
     const [updated] = await db.update(orders)
