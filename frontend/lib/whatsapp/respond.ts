@@ -154,6 +154,45 @@ export async function generateReply(
       }
     }
 
+    // Handle order cancellation
+    if (intent.action === 'cancel_order') {
+      // Extract order number from message
+      const orderNumberMatch = userMessage.match(/[a-f0-9]{6}/i);
+
+      if (orderNumberMatch) {
+        const orderNumber = orderNumberMatch[0].toUpperCase();
+
+        try {
+          // Find order by last 6 chars of ID
+          const order = await db.query.orders.findFirst({
+            where: (orders, { and, eq, like }) =>
+              and(
+                like(orders.id, `%${orderNumber}`),
+                eq(orders.phoneNumber, conversationUserId)
+              ),
+          });
+
+          if (order && order.status === 'pending') {
+            // Update order status to cancelled
+            await db.update(orders)
+              .set({ status: 'cancelled' })
+              .where(eq(orders.id, order.id));
+
+            return `✅ Order #${orderNumber} cancelled successfully.\n\nAgar koi problem thi to please batayein. We're here to help! 😊`;
+          } else if (order && order.status !== 'pending') {
+            return `Order #${orderNumber} ko cancel nahi kar sakte kyunki yeh already ${order.status} hai. Please call us for assistance.`;
+          } else {
+            return `Order #${orderNumber} nahi mila. Please check order number aur phir try karein.`;
+          }
+        } catch (error) {
+          console.error('Order cancellation failed:', error);
+          return `Sorry, order cancel karte waqt issue aa gaya. Please call us directly.`;
+        }
+      } else {
+        return `Order cancel karne ke liye order number bataiye.\n\nExample: "cancel order ABC123"`;
+      }
+    }
+
     // Handle order intent
     if (intent.action === 'order') {
       const extracted = extractOrderDetails(userMessage);
@@ -201,20 +240,38 @@ export async function generateReply(
       }
     }
 
-    // Handle greetings with VARIETY (not hardcoded same response)
+    // Handle greetings with VARIETY and LANGUAGE MATCHING
     if (intent.action === 'greeting') {
-      const greetingVariations = [
+      // Detect user's language from greeting message
+      const msgLower = userMessage.toLowerCase();
+      const isRomanUrdu = msgLower.includes('salam') ||
+                          msgLower.includes('assalam') ||
+                          msgLower.includes('kaise') ||
+                          msgLower.includes('kya hal');
+
+      // Roman Urdu greetings
+      const romanUrduGreetings = [
         `${getGreetingResponse()}! RoyalBite mein aapka swagat hai 🍽️ Main aapki kya madad kar sakta hoon?`,
         `Salam! Welcome to RoyalBite 😊 Menu, timings ya order - kuch bhi poochein!`,
         `${getGreetingResponse()}! Kaisi hain aap? Main RoyalBite ka assistant hoon. Kya jaanna chahte hain?`,
-        `Hello! RoyalBite ke menu, delivery ya timings ke baare mein kuch puchhna hai? 🍛`,
         `${getGreetingResponse()} RoyalBite pe aapka swagat hai! Kaise madad kar sakta hoon aaj?`,
         `Assalam o alaikum! Main aapko RoyalBite ke menu aur orders mein madad kar sakta hoon 👋`,
-        `Hi there! Kya aap hamara menu dekhna chahte hain ya order dena? 🤗`,
         `${getGreetingResponse()}! Welcome back to RoyalBite. Aaj kya order karna hai?`,
       ];
-      // Pick random greeting each time
-      const randomGreeting = greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
+
+      // English greetings
+      const englishGreetings = [
+        `${getGreetingResponse()}! Welcome to RoyalBite 🍽️ How can I help you today?`,
+        `Hello! Welcome to RoyalBite 😊 Feel free to ask about our menu, timings, or place an order!`,
+        `${getGreetingResponse()}! I'm the RoyalBite assistant. What would you like to know?`,
+        `Hi there! Would you like to see our menu or place an order? 🤗`,
+        `${getGreetingResponse()}! Welcome back to RoyalBite. Ready to order today?`,
+        `Hello! How can I assist you with RoyalBite today? 😊`,
+      ];
+
+      // Pick appropriate greeting based on user's language
+      const greetings = isRomanUrdu ? romanUrduGreetings : englishGreetings;
+      const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
       return randomGreeting;
     }
 

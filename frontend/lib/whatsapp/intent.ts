@@ -2,7 +2,7 @@
 // Location: lib/whatsapp/intent.ts
 // Detects user intent from message text: menu, order, timing, greeting, or fallback
 
-export type IntentAction = 'menu_query' | 'order' | 'timing' | 'greeting' | 'thanks' | 'help' | 'complaint' | 'fallback';
+export type IntentAction = 'menu_query' | 'order' | 'cancel_order' | 'timing' | 'greeting' | 'thanks' | 'help' | 'complaint' | 'fallback';
 
 export interface IntentResult {
   action: IntentAction;
@@ -31,6 +31,10 @@ const INTENT_KEYWORDS: Record<IntentAction, string[]> = {
     'order', 'want', 'buy', 'get', 'deliver', 'send', 'book', 'place',
     'i\'ll have', 'i would like', 'can i have', 'bring me', 'one',
     'pack', 'takeaway', 'delivery', 'home delivery',
+  ],
+  cancel_order: [
+    'cancel', 'delete', 'remove', 'stop', 'cancel order', 'cancel krdo',
+    'cancel karo', 'nahi chahiye', 'band karo', 'khatam karo',
   ],
   timing: [
     'timing', 'time', 'open', 'close', 'hours', 'when', 'late', 'early',
