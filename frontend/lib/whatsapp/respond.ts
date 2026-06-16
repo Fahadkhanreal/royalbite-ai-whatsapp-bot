@@ -17,10 +17,28 @@ Your personality:
 - Always represent RoyalBite positively
 
 Your knowledge includes:
-- Menu items, prices, and descriptions
-- Restaurant timings
-- Delivery policies
+- Menu items, prices, and descriptions (from RAG documents)
+- Restaurant timings and delivery policies (from RAG documents)
+- Current offers, announcements, and policies (from Knowledge Base)
 - FAQ information
+
+CRITICAL SCOPE BOUNDARY:
+- You can ONLY answer questions about RoyalBite Restaurant (menu, prices, timings, delivery, orders, location, offers, policies)
+- For ANY question outside restaurant topics (personal questions, general knowledge, other businesses, people's whereabouts, etc.):
+  * Politely decline in the user's language
+  * Example (Roman Urdu): "Main sirf RoyalBite restaurant ke baare mein information de sakta hoon 😊 Menu, timings, offers ya delivery ke baare mein kuch poochna chahte hain?"
+  * Example (English): "I can only help with RoyalBite restaurant information 😊 Would you like to know about our menu, timings, current offers, or delivery?"
+- DO NOT try to answer questions about people, personal matters, or non-restaurant topics
+- Redirect conversation back to restaurant services
+
+CRITICAL SCOPE BOUNDARY:
+- You can ONLY answer questions about RoyalBite Restaurant (menu, prices, timings, delivery, orders, location)
+- For ANY question outside restaurant topics (personal questions, general knowledge, other businesses, people's whereabouts, etc.):
+  * Politely decline in the user's language
+  * Example (Roman Urdu): "Main sirf RoyalBite restaurant ke baare mein information de sakta hoon 😊 Menu, timings, ya delivery ke baare mein kuch poochna chahte hain?"
+  * Example (English): "I can only help with RoyalBite restaurant information 😊 Would you like to know about our menu, timings, or delivery?"
+- DO NOT try to answer questions about people, personal matters, or non-restaurant topics
+- Redirect conversation back to restaurant services
 
 CRITICAL LANGUAGE RULE:
 - ALWAYS reply in the SAME LANGUAGE the user is using
@@ -116,7 +134,7 @@ export async function generateReply(
       }
     }
 
-    // For other queries, use search
+    // For other queries, use search + knowledge base
     const searchResult = await hybridSearch(userMessage, {
       limit: 3,
       minSimilarity: 0.25, // Lowered from 0.4 for hash-based embeddings
@@ -130,18 +148,33 @@ export async function generateReply(
       topSimilarity: searchResult.results[0]?.similarity || 0,
     });
 
+    // ALSO fetch from Knowledge Base (offers, policies, announcements)
+    const knowledgeEntries = await db.query.knowledgeBase.findMany({
+      limit: 5,
+      orderBy: (kb, { desc }) => [desc(kb.createdAt)],
+    });
+
+    console.info('[Knowledge Base] Fetched entries:', {
+      totalEntries: knowledgeEntries.length,
+    });
+
     // Build context from search results
     const contextText = searchResult.results
       .map(r => r.content)
       .join('\n\n');
 
+    // Add knowledge base context
+    const knowledgeContext = knowledgeEntries.length > 0
+      ? '\n\nCurrent Offers & Announcements:\n' + knowledgeEntries.map(e => `- ${e.title}: ${e.content}`).join('\n')
+      : '';
+
     // If no context found, return a helpful message
-    if (!contextText) {
+    if (!contextText && knowledgeEntries.length === 0) {
       console.warn('[RAG] No context found for query:', userMessage.slice(0, 50));
       return `I'd be happy to help you with that! Unfortunately, I don't have specific information about that right now. Could you please rephrase your question? You can ask about our menu, timings, or place an order.`;
     }
 
-    const context = `Relevant information:\n${contextText}\n\nUser question: ${userMessage}`;
+    const context = `Relevant information:\n${contextText}${knowledgeContext}\n\nUser question: ${userMessage}`;
 
     console.info('[Groq] Generating response with context length:', contextText.length);
 
