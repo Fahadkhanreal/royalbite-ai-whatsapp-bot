@@ -115,22 +115,32 @@ export async function POST(req: Request) {
     console.info('[WEBHOOK-V3] Generating reply via RAG + Groq...');
     const reply = await generateReply(msgText, intent, from);
 
-    // Fallback if reply is empty (should never happen with our safeguards)
-    const finalReply = reply && reply.trim().length > 0
+    // Check if we got a real response (not empty/fallback)
+    const hasRealResponse = reply && reply.trim().length > 0;
+
+    // Fallback if reply is empty
+    const finalReply = hasRealResponse
       ? reply
       : 'Thanks for your message! Our team will respond shortly.';
 
     console.info('[WEBHOOK-V3] Reply generated:', {
       replyLength: finalReply.length,
       replyPreview: finalReply.slice(0, 100),
+      isRealResponse: hasRealResponse,
     });
 
     // Send reply back via Green API
     console.info('[WEBHOOK-V3] Sending reply to', from);
     await sendWhatsAppMessage(from, finalReply);
 
-    // Record response to activate cooldown
-    recordResponse(from, intent.action);
+    // Record cooldown ONLY if we sent a real response (not fallback)
+    // This allows user to retry if they got a fallback/error message
+    if (hasRealResponse) {
+      recordResponse(from, intent.action);
+      console.info('[WEBHOOK-V3] Cooldown recorded for', intent.action);
+    } else {
+      console.warn('[WEBHOOK-V3] No cooldown recorded - fallback message sent');
+    }
 
     console.info('[WEBHOOK-V3] ✅ Reply sent successfully!');
     return NextResponse.json({
