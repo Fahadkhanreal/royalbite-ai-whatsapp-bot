@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { requireAdmin } from "@/lib/admin-auth"
 import { ingestDocument } from "@/lib/rag/ingest"
-import pdf from "pdf-parse"
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,7 +21,9 @@ export async function POST(req: NextRequest) {
     // Extract text based on file type
     if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
       try {
-        const pdfData = await pdf(buffer)
+        // Dynamic import for pdf-parse to work with Next.js
+        const pdfParse = (await import("pdf-parse")).default
+        const pdfData = await pdfParse(buffer)
         text = pdfData.text
       } catch (error) {
         console.error("PDF parsing error:", error)
