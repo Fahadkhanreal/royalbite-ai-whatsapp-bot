@@ -1,17 +1,87 @@
+'use client'
+
+import { useState, useEffect } from "react"
 import { Upload, FileText } from "lucide-react"
 import { PageHeader } from "@/components/common/page-header"
-import { Badge } from "@/components/ui/badge"
-import { listRagDocuments as listDocuments } from "@/lib/repositories/admin-data"
 import { EmptyState } from "@/components/common/feedback-states"
+import { useRouter } from "next/navigation"
 
-export default async function DocumentsPage() {
-  const documents = await listDocuments()
+export default function DocumentsPage() {
+  const router = useRouter()
+  const [documents, setDocuments] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [reindexLoading, setReindexLoading] = useState<string | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
+
+  // Fetch documents
+  const fetchDocuments = async () => {
+    try {
+      const res = await fetch('/api/admin/documents')
+      const data = await res.json()
+      setDocuments(data.data?.documents || [])
+    } catch (error) {
+      console.error('Failed to fetch documents:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchDocuments()
+  }, [])
+
+  // Handle re-index
+  const handleReindex = async (id: string) => {
+    setReindexLoading(id)
+    try {
+      await fetch(`/api/admin/documents/${id}/reindex`, {
+        method: 'POST',
+      })
+      alert('Document re-indexed successfully!')
+      await fetchDocuments()
+      router.refresh()
+    } catch (error) {
+      console.error('Failed to re-index document:', error)
+      alert('Failed to re-index document')
+    } finally {
+      setReindexLoading(null)
+    }
+  }
+
+  // Handle delete
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this document?')) return
+
+    setDeleteLoading(id)
+    try {
+      await fetch(`/api/admin/documents?id=${id}`, {
+        method: 'DELETE',
+      })
+      await fetchDocuments()
+      router.refresh()
+    } catch (error) {
+      console.error('Failed to delete document:', error)
+      alert('Failed to delete document')
+    } finally {
+      setDeleteLoading(null)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div style={{ color: "#C9A227" }}>Loading...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <PageHeader title="RAG Documents" description="Upload and manage documents for the knowledge retrieval system." />
-        <button className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-playfair font-bold transition-all duration-300 hover:shadow-[0_0_40px_rgba(201,162,39,0.6)] hover:scale-[1.04]"
+        <button
+          onClick={() => alert('Document upload feature coming soon! Currently use seed script to add documents.')}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-playfair font-bold transition-all duration-300 hover:shadow-[0_0_40px_rgba(201,162,39,0.6)] hover:scale-[1.04]"
           style={{ background: "linear-gradient(135deg, #C9A227, #A67D1F)", color: "#0A0A0A", boxShadow: "0 0 20px rgba(201,162,39,0.3)" }}>
           <Upload className="size-4" /> Upload Document
         </button>
@@ -42,11 +112,19 @@ export default async function DocumentsPage() {
                   </span>
                 </div>
                 <div className="flex gap-2 mt-4">
-                  <button className="flex-1 py-2 rounded-lg text-sm font-medium transition-all hover:bg-[rgba(201,162,39,0.15)]" style={{ background: "rgba(201,162,39,0.08)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.15)" }}>
-                    Re-index
+                  <button
+                    onClick={() => handleReindex(doc.id)}
+                    disabled={reindexLoading === doc.id}
+                    className="flex-1 py-2 rounded-lg text-sm font-medium transition-all hover:bg-[rgba(201,162,39,0.15)]"
+                    style={{ background: "rgba(201,162,39,0.08)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.15)" }}>
+                    {reindexLoading === doc.id ? "Re-indexing..." : "Re-index"}
                   </button>
-                  <button className="flex-1 py-2 rounded-lg text-sm font-medium transition-all hover:bg-[rgba(239,68,68,0.2)]" style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
-                    Delete
+                  <button
+                    onClick={() => handleDelete(doc.id)}
+                    disabled={deleteLoading === doc.id}
+                    className="flex-1 py-2 rounded-lg text-sm font-medium transition-all hover:bg-[rgba(239,68,68,0.2)]"
+                    style={{ background: "rgba(239,68,68,0.1)", color: "#EF4444", border: "1px solid rgba(239,68,68,0.2)" }}>
+                    {deleteLoading === doc.id ? "Deleting..." : "Delete"}
                   </button>
                 </div>
               </div>
