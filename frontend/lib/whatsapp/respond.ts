@@ -6,6 +6,8 @@ import { generateResponse } from '@/lib/groq/client';
 import { hybridSearch } from '@/lib/rag/search';
 import { getGreetingResponse, IntentResult } from './intent';
 import { db } from '@/lib/db';
+import { orders } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 import { getConversationState, setConversationState, clearConversationState } from './conversation-state';
 import { extractOrderDetails, createOrder, formatOrderConfirmation } from './order-handler';
 
