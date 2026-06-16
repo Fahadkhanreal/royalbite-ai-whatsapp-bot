@@ -8,6 +8,7 @@ import { detectIntent } from '@/lib/whatsapp/intent';
 import { generateReply } from '@/lib/whatsapp/respond';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
 import { isInCooldown, recordResponse, getCooldownRemaining } from '@/lib/whatsapp/cooldown';
+import { isMessageProcessed, markMessageProcessed } from '@/lib/whatsapp/message-dedup';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -87,6 +88,28 @@ export async function POST(req: Request) {
     if (!msgText || msgText.length === 0) {
       console.warn('[WEBHOOK-V3] Empty message received, ignoring');
       return NextResponse.json({ status: 'ignored', reason: 'empty_message' });
+    }
+
+    // Check for duplicate messages to prevent double-processing
+    const messageId = body.idMessage;
+    if (messageId && isMessageProcessed(messageId)) {
+      console.warn('[WEBHOOK-V3] 🔁 Duplicate message detected:', {
+        messageId,
+        from,
+        text: msgText.slice(0, 50),
+        reason: 'Message already processed (Green API duplicate webhook)'
+      });
+      return NextResponse.json({
+        status: 'ignored',
+        reason: 'duplicate_message',
+        messageId
+      });
+    }
+
+    // Mark message as processed EARLY to prevent race conditions
+    if (messageId) {
+      markMessageProcessed(messageId);
+      console.info('[WEBHOOK-V3] ✓ Message marked as processed:', messageId);
     }
 
     // Detect intent (menu, reservation, hours, etc.)

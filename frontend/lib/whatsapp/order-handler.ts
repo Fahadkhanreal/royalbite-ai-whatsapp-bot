@@ -36,13 +36,15 @@ export function extractOrderDetails(message: string, menuContext?: string): {
   // Extract address - IMPROVED to capture more formats
   let address: string | null = null;
 
-  // Try multiple address patterns
+  // Try multiple address patterns (ORDER MATTERS - more specific first!)
   const addressPatterns = [
-    // Pattern 1: house/flat/block style
-    /(house|flat|apartment|block|street|road|area|sector|phase)[\s\d\w,.\/-]+/i,
-    // Pattern 2: FC area, DHA, Clifton style (areas without house keyword)
+    // Pattern 1: FC area, DHA, Clifton style (check FIRST to capture full name)
     /(fc|dha|clifton|gulshan|north\s*nazimabad|saddar|pechs|defence|malir|korangi)[\s\w\d,.\/-]+/i,
-    // Pattern 3: Generic pattern - anything after common delivery keywords
+    // Pattern 2: house/flat/block style
+    /(house|flat|apartment|block|street|road|sector|phase)[\s\d\w,.\/-]+/i,
+    // Pattern 3: "area" with preceding context (capture word before "area" too)
+    /(\w+\s+area[\s\w\d,.\/-]+)/i,
+    // Pattern 4: Generic pattern - anything after common delivery keywords
     /(?:address[:\s]+|deliver[:\s]+to[:\s]+|location[:\s]+)([\w\s\d,.\/-]+)/i,
   ];
 

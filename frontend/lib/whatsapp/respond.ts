@@ -7,7 +7,7 @@ import { hybridSearch } from '@/lib/rag/search';
 import { getGreetingResponse, IntentResult } from './intent';
 import { db } from '@/lib/db';
 import { orders } from '@/lib/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, ilike } from 'drizzle-orm';
 import { getConversationState, setConversationState, clearConversationState } from './conversation-state';
 import { extractOrderDetails, createOrder, formatOrderConfirmation } from './order-handler';
 
@@ -48,7 +48,24 @@ CRITICAL LANGUAGE RULE:
 - ALWAYS reply in the SAME LANGUAGE the user is using
 - If user writes in Roman Urdu (e.g., "kya menu ha", "timings batao"), reply in Roman Urdu
 - If user writes in English, reply in English
-- If user writes in Urdu script, reply in Urdu script
+- If user writes in Urdu script (اردو), reply in Urdu script
+
+LANGUAGE SCRIPT RULES (CRITICAL):
+- Roman Urdu = Latin alphabet ONLY (a-z characters). Examples:
+  * "Peer se Jumma: 11:00 AM se 10:00 PM" ✓
+  * "Timings: Subah 11 baje se raat 10 baje tak" ✓
+  * "Aap kab visit karna chahte hain?" ✓
+- NEVER use Hindi/Devanagari script (समवार, शुक्रवार, etc.) ✗
+- NEVER use Urdu script (پیر سے جمعہ) unless user writes in Urdu script ✗
+- Only THREE valid options:
+  1. Roman Urdu (Latin letters: Peer, Jumma, subah, raat, kya, hai)
+  2. English (Monday, Friday, morning, night, what, is)
+  3. Urdu script (only if user uses Urdu script)
+
+PROHIBITED:
+- Hindi Devanagari script in ANY response (Somvaar, Shukravaar, etc.)
+- Mixing scripts (Roman + Devanagari in same message)
+
 - Use natural, conversational style matching the user's tone
 
 CRITICAL CONTEXT RULE:
