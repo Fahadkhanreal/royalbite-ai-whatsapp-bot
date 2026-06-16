@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from "react"
-import { Upload, FileText } from "lucide-react"
+import { Upload, FileText, Eye } from "lucide-react"
 import { PageHeader } from "@/components/common/page-header"
 import { EmptyState } from "@/components/common/feedback-states"
 import { DocumentUploadDialog } from "@/components/admin/document-upload-dialog"
+import { DocumentPreviewDialog } from "@/components/admin/document-preview-dialog"
 import { useRouter } from "next/navigation"
 
 export default function DocumentsPage() {
@@ -12,6 +13,8 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
+  const [previewDialogOpen, setPreviewDialogOpen] = useState(false)
+  const [selectedDocument, setSelectedDocument] = useState<any>(null)
   const [reindexLoading, setReindexLoading] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
@@ -55,6 +58,12 @@ export default function DocumentsPage() {
       console.error('Failed to upload document:', error)
       throw error
     }
+  }
+
+  // Handle preview
+  const handlePreview = (doc: any) => {
+    setSelectedDocument(doc)
+    setPreviewDialogOpen(true)
   }
 
   // Handle re-index
@@ -140,6 +149,12 @@ export default function DocumentsPage() {
                 </div>
                 <div className="flex gap-2 mt-4">
                   <button
+                    onClick={() => handlePreview(doc)}
+                    className="flex-1 py-2 rounded-lg text-sm font-medium transition-all hover:bg-[rgba(201,162,39,0.15)]"
+                    style={{ background: "rgba(201,162,39,0.08)", color: "#C9A227", border: "1px solid rgba(201,162,39,0.15)" }}>
+                    <Eye className="size-4 inline mr-1" /> Preview
+                  </button>
+                  <button
                     onClick={() => handleReindex(doc.id)}
                     disabled={reindexLoading === doc.id}
                     className="flex-1 py-2 rounded-lg text-sm font-medium transition-all hover:bg-[rgba(201,162,39,0.15)]"
@@ -164,6 +179,12 @@ export default function DocumentsPage() {
         open={uploadDialogOpen}
         onOpenChange={setUploadDialogOpen}
         onUpload={handleUpload}
+      />
+
+      <DocumentPreviewDialog
+        open={previewDialogOpen}
+        onOpenChange={setPreviewDialogOpen}
+        document={selectedDocument}
       />
     </div>
   )
