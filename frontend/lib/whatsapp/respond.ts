@@ -201,11 +201,30 @@ export async function generateReply(
           } else if (order && order.status !== 'pending') {
             return `Order #${orderNumber} ko cancel nahi kar sakte kyunki yeh already ${order.status} hai. Please call us for assistance.`;
           } else {
-            return `Order #${orderNumber} nahi mila. Please check order number aur phir try karein.`;
+            // Order not found - could be wrong number or different phone
+            // Try to find user's recent orders to help them
+            const recentOrders = await db.query.orders.findMany({
+              where: (orders, { and, eq }) =>
+                and(
+                  eq(orders.phoneNumber, conversationUserId),
+                  eq(orders.status, 'pending')
+                ),
+              orderBy: (orders, { desc }) => [desc(orders.createdAt)],
+              limit: 3,
+            });
+
+            if (recentOrders.length > 0) {
+              const orderList = recentOrders
+                .map(o => `#${o.id.slice(-6).toUpperCase()}`)
+                .join(', ');
+              return `Order #${orderNumber} nahi mila is number par.\n\nAapke recent pending orders:\n${orderList}\n\nIn mein se koi cancel karna chahte hain?`;
+            } else {
+              return `Order #${orderNumber} nahi mila. Aapke koi pending orders nahi hain is number par.\n\nShayad:\n- Order already cancelled/delivered\n- Order number galat hai\n- Different number se order kiya tha\n\nHelp ke liye call karein!`;
+            }
           }
         } catch (error) {
           console.error('Order cancellation failed:', error);
-          return `Sorry, order cancel karte waqt issue aa gaya. Please call us directly.`;
+          return `Sorry, order cancel karte waqt technical issue aa gaya. Please call us directly: ${error instanceof Error ? error.message : ''}`;
         }
       } else {
         return `Order cancel karne ke liye order number bataiye.\n\nExample: "cancel order ABC123"`;
