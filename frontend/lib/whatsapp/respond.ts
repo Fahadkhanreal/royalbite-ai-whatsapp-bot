@@ -289,68 +289,103 @@ export async function generateReply(
     if (intent.action === 'menu_query') {
       console.info('[RAG] Menu query detected - fetching from admin menu + documents');
 
-      // 1. Fetch from admin menu (dishes table)
-      const adminMenuItems = await db.query.dishes.findMany({
-        where: (dishes, { eq }) => eq(dishes.isAvailable, true),
-        orderBy: (dishes, { asc }) => [asc(dishes.category)],
-      });
-
-      // 2. Fetch from RAG documents (menu items from documents table)
-      const ragMenuDocs = await db.query.documents.findMany({
-        where: (docs, { eq }) => eq(docs.source, 'menu'),
-      });
-
-      console.info('[RAG] Menu sources loaded:', {
-        adminItems: adminMenuItems.length,
-        ragDocs: ragMenuDocs.length,
-      });
-
-      // Build combined menu context
-      let menuContext = 'RoyalBite Complete Menu:\n\n';
-
-      // Add admin menu items (if any)
-      if (adminMenuItems.length > 0) {
-        const menuByCategory: Record<string, any[]> = {};
-        adminMenuItems.forEach(item => {
-          const category = item.category || 'Other';
-          if (!menuByCategory[category]) {
-            menuByCategory[category] = [];
-          }
-          menuByCategory[category].push(item);
+      try {
+        // 1. Fetch from admin menu (dishes table)
+        const adminMenuItems = await db.query.dishes.findMany({
+          where: (dishes, { eq }) => eq(dishes.isAvailable, true),
+          orderBy: (dishes, { asc }) => [asc(dishes.category)],
         });
 
-        for (const [category, items] of Object.entries(menuByCategory)) {
-          menuContext += `${category}:\n`;
-          items.forEach(item => {
-            menuContext += `- ${item.name}: ${item.description || 'Delicious dish'}. Price: Rs. ${item.price}\n`;
+        // 2. Fetch from RAG documents (menu items from documents table)
+        const ragMenuDocs = await db.query.documents.findMany({
+          where: (docs, { eq }) => eq(docs.source, 'menu'),
+        });
+
+        console.info('[RAG] Menu sources loaded:', {
+          adminItems: adminMenuItems.length,
+          ragDocs: ragMenuDocs.length,
+        });
+
+        // Build combined menu context - OPTIMIZED for speed
+        let menuContext = 'RoyalBite Complete Menu:\n\n';
+
+        // Add admin menu items (if any)
+        if (adminMenuItems.length > 0) {
+          const menuByCategory: Record<string, any[]> = {};
+          adminMenuItems.forEach(item => {
+            const category = item.category || 'Other';
+            if (!menuByCategory[category]) {
+              menuByCategory[category] = [];
+            }
+            menuByCategory[category].push(item);
           });
-          menuContext += '\n';
+
+          for (const [category, items] of Object.entries(menuByCategory)) {
+            menuContext += `${category}:\n`;
+            items.forEach(item => {
+              // Shortened format for speed
+              menuContext += `- ${item.name}: Rs. ${item.price}\n`;
+            });
+            menuContext += '\n';
+          }
         }
+
+        // Add RAG document menu items - TRUNCATE if too long
+        if (ragMenuDocs.length > 0) {
+          const ragContent = ragMenuDocs.map(doc => doc.content).join('\n');
+          // Limit to 3000 chars to prevent timeout
+          menuContext += ragContent.length > 3000 ? ragContent.slice(0, 3000) + '\n...(more items available)' : ragContent;
+        }
+
+        // If no menu items at all
+        if (adminMenuItems.length === 0 && ragMenuDocs.length === 0) {
+          return `I'm sorry, our menu is being updated right now. Please check back in a few minutes or call us directly!`;
+        }
+
+        const context = `${menuContext}\n\nUser question: ${userMessage}`;
+        console.info('[RAG] Combined menu context ready:', {
+          contextLength: menuContext.length,
+          truncated: menuContext.includes('...(more items available)'),
+        });
+
+        // Call Groq with 7 second timeout (webhook has 10s total)
+        const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 1200, 7000);
+
+        if (!reply || reply.trim().length === 0) {
+          console.error('[Groq] CRITICAL: Groq returned empty despite no error thrown!');
+          return `Thank you for your message! Our team is currently reviewing it and will respond shortly. You can also call us for immediate assistance!`;
+        }
+
+        return reply;
+      } catch (error) {
+        console.error('[RAG] Menu query failed:', error);
+
+        // Timeout or error - send quick fallback
+        if (error instanceof Error && error.message.includes('timeout')) {
+          console.warn('[RAG] Groq timeout detected - sending fallback menu');
+
+          // Emergency fallback: Send brief menu directly without Groq
+          try {
+            const quickItems = await db.query.dishes.findMany({
+              where: (dishes, { eq }) => eq(dishes.isAvailable, true),
+              limit: 10,
+            });
+
+            if (quickItems.length > 0) {
+              let quickMenu = '📋 RoyalBite Menu:\n\n';
+              quickItems.forEach(item => {
+                quickMenu += `• ${item.name} - Rs. ${item.price}\n`;
+              });
+              quickMenu += '\n📞 Call us for complete menu & orders!';
+              return quickMenu;
+            }
+          } catch (dbError) {
+            console.error('[RAG] Even fallback failed:', dbError);
+          }
+        }
+
+        return `Menu load ho raha hai... Thoda slow connection hai. Please try again ya call karein for instant menu! 😊`;
       }
-
-      // Add RAG document menu items
-      if (ragMenuDocs.length > 0) {
-        menuContext += ragMenuDocs.map(doc => doc.content).join('\n');
-      }
-
-      // If no menu items at all
-      if (adminMenuItems.length === 0 && ragMenuDocs.length === 0) {
-        return `I'm sorry, our menu is being updated right now. Please check back in a few minutes or call us directly!`;
-      }
-
-      const context = `${menuContext}\n\nUser question: ${userMessage}`;
-      console.info('[RAG] Combined menu context ready:', {
-        contextLength: menuContext.length,
-      });
-
-      const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 1200);
-
-      if (!reply || reply.trim().length === 0) {
-        console.error('[Groq] CRITICAL: Groq returned empty despite no error thrown!');
-        return `Thank you for your message! Our team is currently reviewing it and will respond shortly. You can also call us for immediate assistance!`;
-      }
-
-      return reply;
     }
 
     // For other queries, use search + knowledge base

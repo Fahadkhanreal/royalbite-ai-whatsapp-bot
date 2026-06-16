@@ -16,7 +16,8 @@ export async function generateResponse(
   systemPrompt: string,
   userMessage: string,
   temperature: number = 0.7,
-  maxTokens: number = 1024
+  maxTokens: number = 1024,
+  timeoutMs: number = 8000 // 8 second timeout to stay under Vercel's 10s limit
 ): Promise<string> {
   try {
     console.info('[GROQ] Starting request:', {
@@ -25,23 +26,33 @@ export async function generateResponse(
       apiKeyPrefix: env.GROQ_API_KEY ? env.GROQ_API_KEY.slice(0, 10) : 'MISSING',
       maxTokens,
       temperature,
+      timeoutMs,
     });
 
-    const completion = await groq.chat.completions.create({
-      model: env.GROQ_MODEL,
-      max_tokens: maxTokens,
-      temperature,
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt,
-        },
-        {
-          role: 'user',
-          content: userMessage,
-        },
-      ],
+    // Create timeout promise
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error(`Groq API timeout after ${timeoutMs}ms`)), timeoutMs);
     });
+
+    // Race between API call and timeout
+    const completion = await Promise.race([
+      groq.chat.completions.create({
+        model: env.GROQ_MODEL,
+        max_tokens: maxTokens,
+        temperature,
+        messages: [
+          {
+            role: 'system',
+            content: systemPrompt,
+          },
+          {
+            role: 'user',
+            content: userMessage,
+          },
+        ],
+      }),
+      timeoutPromise,
+    ]);
 
     console.info('[GROQ] Response received:', {
       hasChoices: Boolean(completion.choices?.length),
