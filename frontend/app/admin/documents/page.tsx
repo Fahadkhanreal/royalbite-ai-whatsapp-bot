@@ -4,12 +4,14 @@ import { useState, useEffect } from "react"
 import { Upload, FileText } from "lucide-react"
 import { PageHeader } from "@/components/common/page-header"
 import { EmptyState } from "@/components/common/feedback-states"
+import { DocumentUploadDialog } from "@/components/admin/document-upload-dialog"
 import { useRouter } from "next/navigation"
 
 export default function DocumentsPage() {
   const router = useRouter()
   const [documents, setDocuments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false)
   const [reindexLoading, setReindexLoading] = useState<string | null>(null)
   const [deleteLoading, setDeleteLoading] = useState<string | null>(null)
 
@@ -29,6 +31,31 @@ export default function DocumentsPage() {
   useEffect(() => {
     fetchDocuments()
   }, [])
+
+  // Handle file upload
+  const handleUpload = async (file: File, source: string) => {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('source', source)
+
+      const res = await fetch('/api/admin/documents/upload', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!res.ok) {
+        throw new Error('Upload failed')
+      }
+
+      await fetchDocuments()
+      router.refresh()
+      alert('Document uploaded and processed successfully!')
+    } catch (error) {
+      console.error('Failed to upload document:', error)
+      throw error
+    }
+  }
 
   // Handle re-index
   const handleReindex = async (id: string) => {
@@ -80,7 +107,7 @@ export default function DocumentsPage() {
       <div className="flex items-center justify-between">
         <PageHeader title="RAG Documents" description="Upload and manage documents for the knowledge retrieval system." />
         <button
-          onClick={() => alert('Document upload feature coming soon! Currently use seed script to add documents.')}
+          onClick={() => setUploadDialogOpen(true)}
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-playfair font-bold transition-all duration-300 hover:shadow-[0_0_40px_rgba(201,162,39,0.6)] hover:scale-[1.04]"
           style={{ background: "linear-gradient(135deg, #C9A227, #A67D1F)", color: "#0A0A0A", boxShadow: "0 0 20px rgba(201,162,39,0.3)" }}>
           <Upload className="size-4" /> Upload Document
@@ -132,6 +159,12 @@ export default function DocumentsPage() {
           ))}
         </div>
       )}
+
+      <DocumentUploadDialog
+        open={uploadDialogOpen}
+        onOpenChange={setUploadDialogOpen}
+        onUpload={handleUpload}
+      />
     </div>
   )
 }
