@@ -57,8 +57,8 @@ export function DocumentUploadDialog({ open, onOpenChange, onUpload }: DocumentU
   }
 
   const isValidFile = (file: File): boolean => {
-    const validTypes = ['application/pdf', 'text/plain']
-    const validExtensions = ['.pdf', '.txt']
+    const validTypes = ['text/plain']
+    const validExtensions = ['.txt']
     return validTypes.includes(file.type) || validExtensions.some(ext => file.name.endsWith(ext))
   }
 
@@ -107,7 +107,7 @@ export function DocumentUploadDialog({ open, onOpenChange, onUpload }: DocumentU
           </div>
 
           <div className="space-y-2">
-            <Label style={{ color: "#C9A227" }}>File Upload (PDF or TXT)</Label>
+            <Label style={{ color: "#C9A227" }}>File Upload (TXT only)</Label>
             <div
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                 dragActive ? 'border-[#C9A227] bg-[rgba(201,162,39,0.1)]' : 'border-[rgba(201,162,39,0.3)]'
@@ -141,11 +141,13 @@ export function DocumentUploadDialog({ open, onOpenChange, onUpload }: DocumentU
                     Drag & drop or click to browse
                   </p>
                   <p className="text-xs" style={{ color: "#6B6560" }}>
-                    Supports: PDF, TXT (Max 10MB)
+                    Supports: TXT files only (Max 10MB)
+                    <br />
+                    <span style={{ color: "#C9A227" }}>Tip: Copy PDF text and save as .txt</span>
                   </p>
                   <input
                     type="file"
-                    accept=".pdf,.txt"
+                    accept=".txt,text/plain"
                     onChange={handleFileChange}
                     className="hidden"
                     id="file-upload"
