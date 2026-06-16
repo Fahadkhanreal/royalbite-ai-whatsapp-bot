@@ -7,7 +7,7 @@ import { hybridSearch } from '@/lib/rag/search';
 import { getGreetingResponse, IntentResult } from './intent';
 import { db } from '@/lib/db';
 import { orders } from '@/lib/db/schema';
-import { eq, ilike } from 'drizzle-orm';
+import { eq, ilike, sql } from 'drizzle-orm';
 import { getConversationState, setConversationState, clearConversationState } from './conversation-state';
 import { extractOrderDetails, createOrder, formatOrderConfirmation } from './order-handler';
 
@@ -183,10 +183,11 @@ export async function generateReply(
 
         try {
           // Find order by last 6 chars of ID (case-insensitive)
+          // Must cast UUID to text for LIKE to work
           const order = await db.query.orders.findFirst({
-            where: (orders, { and, eq, ilike }) =>
+            where: (orders, { and, eq }) =>
               and(
-                ilike(orders.id, `%${orderNumber.toLowerCase()}`),
+                sql`LOWER(${orders.id}::text) LIKE ${`%${orderNumber.toLowerCase()}`}`,
                 eq(orders.phoneNumber, conversationUserId)
               ),
           });
