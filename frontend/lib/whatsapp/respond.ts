@@ -108,44 +108,62 @@ export async function generateReply(
       return getHelpResponse();
     }
 
-    // SPECIAL CASE: For menu queries, fetch from ADMIN MENU (dishes table)
+    // SPECIAL CASE: For menu queries, fetch from BOTH admin menu AND documents
     if (intent.action === 'menu_query') {
-      console.info('[RAG] Menu query detected - fetching from admin menu (dishes table)');
+      console.info('[RAG] Menu query detected - fetching from admin menu + documents');
 
-      // Fetch actual menu items from dishes table (admin-managed)
-      const menuItems = await db.query.dishes.findMany({
+      // 1. Fetch from admin menu (dishes table)
+      const adminMenuItems = await db.query.dishes.findMany({
         where: (dishes, { eq }) => eq(dishes.isAvailable, true),
         orderBy: (dishes, { asc }) => [asc(dishes.category)],
       });
 
-      if (menuItems.length === 0) {
+      // 2. Fetch from RAG documents (menu items from documents table)
+      const ragMenuDocs = await db.query.documents.findMany({
+        where: (docs, { eq }) => eq(docs.source, 'menu'),
+      });
+
+      console.info('[RAG] Menu sources loaded:', {
+        adminItems: adminMenuItems.length,
+        ragDocs: ragMenuDocs.length,
+      });
+
+      // Build combined menu context
+      let menuContext = 'RoyalBite Complete Menu:\n\n';
+
+      // Add admin menu items (if any)
+      if (adminMenuItems.length > 0) {
+        const menuByCategory: Record<string, any[]> = {};
+        adminMenuItems.forEach(item => {
+          const category = item.category || 'Other';
+          if (!menuByCategory[category]) {
+            menuByCategory[category] = [];
+          }
+          menuByCategory[category].push(item);
+        });
+
+        for (const [category, items] of Object.entries(menuByCategory)) {
+          menuContext += `${category}:\n`;
+          items.forEach(item => {
+            menuContext += `- ${item.name}: ${item.description || 'Delicious dish'}. Price: Rs. ${item.price}\n`;
+          });
+          menuContext += '\n';
+        }
+      }
+
+      // Add RAG document menu items
+      if (ragMenuDocs.length > 0) {
+        menuContext += ragMenuDocs.map(doc => doc.content).join('\n');
+      }
+
+      // If no menu items at all
+      if (adminMenuItems.length === 0 && ragMenuDocs.length === 0) {
         return `I'm sorry, our menu is being updated right now. Please check back in a few minutes or call us directly!`;
       }
 
-      // Format menu items by category
-      const menuByCategory: Record<string, any[]> = {};
-      menuItems.forEach(item => {
-        const category = item.category || 'Other';
-        if (!menuByCategory[category]) {
-          menuByCategory[category] = [];
-        }
-        menuByCategory[category].push(item);
-      });
-
-      // Build menu context
-      let menuContext = 'RoyalBite Menu (Current Items):\n\n';
-      for (const [category, items] of Object.entries(menuByCategory)) {
-        menuContext += `${category}:\n`;
-        items.forEach(item => {
-          menuContext += `- ${item.name}: ${item.description || 'Delicious dish'}. Price: Rs. ${item.price}\n`;
-        });
-        menuContext += '\n';
-      }
-
       const context = `${menuContext}\n\nUser question: ${userMessage}`;
-      console.info('[RAG] Menu context loaded from dishes table:', {
-        totalItems: menuItems.length,
-        categories: Object.keys(menuByCategory),
+      console.info('[RAG] Combined menu context ready:', {
+        contextLength: menuContext.length,
       });
 
       const reply = await generateResponse(SYSTEM_PROMPT, context, 0.7, 1200);
