@@ -76,22 +76,51 @@ export async function GET(request: NextRequest) {
     const totalCount = (await db.query.orders.findMany()).length;
 
     // Transform orders to match frontend interface
-    const transformedOrders = result.map((order: any) => ({
-      id: order.id,
-      customerName: order.phoneNumber, // Use phone as name for now
-      customerPhone: order.phoneNumber,
-      customerAddress: order.specialInstructions || '',
-      items: order.items?.map((item: any) => ({
+    const transformedOrders = result.map((order: any) => {
+      // Extract items from order_items relation
+      let items = order.items?.map((item: any) => ({
         menuItemId: item.dishId,
         name: item.dish?.name || 'Unknown Item',
         quantity: item.quantity || 1,
         unitPrice: parseFloat(item.priceAtOrder || '0'),
-      })) || [],
-      totalAmount: parseFloat(order.totalPrice || '0'),
-      status: order.status,
-      createdAt: order.createdAt,
-      updatedAt: order.updatedAt,
-    }));
+      })) || [];
+
+      // If no items from order_items, try to parse specialInstructions
+      // Format: "2x tikka @ Rs. 250" or "2x tikka @ Rs. 250; 1x samosa @ Rs. 50"
+      if (items.length === 0 && order.specialInstructions) {
+        const instructionItems = order.specialInstructions.split(';').map((part: string) => {
+          const match = part.trim().match(/(\d+)x\s+(.+?)\s+@\s+Rs\.\s+(\d+)/i);
+          if (match) {
+            const quantity = parseInt(match[1]);
+            const name = match[2].trim();
+            const price = parseInt(match[3]);
+            return {
+              menuItemId: 'custom',
+              name,
+              quantity,
+              unitPrice: price,
+            };
+          }
+          return null;
+        }).filter(Boolean);
+
+        if (instructionItems.length > 0) {
+          items = instructionItems;
+        }
+      }
+
+      return {
+        id: order.id,
+        customerName: order.phoneNumber, // Use phone as name for now
+        customerPhone: order.phoneNumber,
+        customerAddress: order.specialInstructions || '',
+        items,
+        totalAmount: parseFloat(order.totalPrice || '0'),
+        status: order.status,
+        createdAt: order.createdAt,
+        updatedAt: order.updatedAt,
+      };
+    });
 
     return NextResponse.json(
       successResponse({
