@@ -188,6 +188,7 @@ export async function generateReply(
         }${
           missing.includes('address') ? '- Delivery address?\n' : ''
         }\nExample: "2 chicken biryani, House 123 Block 5 Gulshan"`;
+        }
       }
     }
 
