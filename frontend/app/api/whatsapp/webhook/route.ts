@@ -1,34 +1,25 @@
-// WhatsApp Webhook - WATI handler v3.1 - WITH DEDUPLICATION
-// Force rebuild: 2026-06-18T00:00:00Z
+// WhatsApp Webhook - WATI handler v3.2 - DATABASE DEDUPLICATION
+// Force rebuild: 2026-06-18T04:15:00Z
 // This file MUST generate a new webpack hash
 import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
 import { generateReply } from '@/lib/whatsapp/respond';
 import { detectIntent } from '@/lib/whatsapp/intent';
+import { db } from '@/lib/db';
+import { processedWebhooks } from '@/lib/db/schema';
+import { eq, sql } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 30; // Force new deployment
 
-// MESSAGE DEDUPLICATION - Prevent processing same message twice
-const processedMessages = new Map<string, number>();
-const MESSAGE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
-
-function cleanupOldMessages() {
-  const now = Date.now();
-  for (const [msgId, timestamp] of processedMessages.entries()) {
-    if (now - timestamp > MESSAGE_EXPIRY_MS) {
-      processedMessages.delete(msgId);
-    }
+// Clean up old processed messages (older than 5 minutes)
+async function cleanupOldMessages() {
+  try {
+    await db.delete(processedWebhooks)
+      .where(sql`${processedWebhooks.processedAt} < NOW() - INTERVAL '5 minutes'`);
+  } catch (error) {
+    console.error('[WEBHOOK] Cleanup failed:', error);
   }
-}
-
-function isMessageProcessed(messageId: string): boolean {
-  cleanupOldMessages();
-  return processedMessages.has(messageId);
-}
-
-function markMessageProcessed(messageId: string): void {
-  processedMessages.set(messageId, Date.now());
 }
 
 export async function GET() {
@@ -156,21 +147,42 @@ export async function POST(req: Request) {
       messageId = `${from}-${msgText.slice(0, 50)}-${timestamp}`;
     }
 
-    // Check if already processed
-    if (isMessageProcessed(messageId)) {
-      console.info('[WEBHOOK] DUPLICATE MESSAGE BLOCKED:', {
-        messageId: messageId.slice(0, 30),
-        from: `${from.slice(0, 6)}xxx`,
-        message: msgText.slice(0, 30),
+    // DATABASE DEDUPLICATION CHECK - Works across all Vercel instances
+    try {
+      const existing = await db.query.processedWebhooks.findFirst({
+        where: eq(processedWebhooks.messageId, messageId),
       });
-      return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked' }), {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      });
-    }
 
-    // Mark as processing NOW (before any async work)
-    markMessageProcessed(messageId);
+      if (existing) {
+        console.info('[WEBHOOK] DUPLICATE MESSAGE BLOCKED (DATABASE):', {
+          messageId: messageId.slice(0, 30),
+          from: `${from.slice(0, 6)}xxx`,
+          message: msgText.slice(0, 30),
+          processedAt: existing.processedAt,
+        });
+        return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+
+      // Mark as processing NOW (insert into database BEFORE any async work)
+      await db.insert(processedWebhooks).values({
+        messageId,
+        phoneNumber: from,
+        messagePreview: msgText.slice(0, 100),
+      });
+
+      console.info('[WEBHOOK] Message marked as processing in database:', {
+        messageId: messageId.slice(0, 30),
+      });
+
+      // Cleanup old messages (async, don't wait)
+      cleanupOldMessages().catch(err => console.error('[WEBHOOK] Cleanup error:', err));
+    } catch (dedupError) {
+      console.error('[WEBHOOK] Deduplication check failed:', dedupError);
+      // If dedup fails, continue anyway (better to risk duplicate than block all messages)
+    }
 
     // Debug: Log the actual text field to see what WATI sends
     console.info('[WEBHOOK] Raw payload analysis:', {

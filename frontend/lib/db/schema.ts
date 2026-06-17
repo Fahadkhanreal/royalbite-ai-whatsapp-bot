@@ -201,6 +201,21 @@ export const sessions = pgTable('sessions', {
 }));
 
 // ============================================
+// PROCESSED_WEBHOOKS TABLE (Message Deduplication)
+// ============================================
+
+export const processedWebhooks = pgTable('processed_webhooks', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  messageId: varchar('message_id', { length: 500 }).notNull().unique(),
+  phoneNumber: varchar('phone_number', { length: 50 }),
+  messagePreview: text('message_preview'),
+  processedAt: timestamp('processed_at').defaultNow().notNull(),
+}, (table) => ({
+  messageIdIdx: index('idx_processed_webhooks_message_id').on(table.messageId),
+  processedAtIdx: index('idx_processed_webhooks_processed_at').on(table.processedAt),
+}));
+
+// ============================================
 // RELATIONS
 // ============================================
 
