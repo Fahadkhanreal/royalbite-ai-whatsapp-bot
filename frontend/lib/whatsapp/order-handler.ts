@@ -70,13 +70,43 @@ export function extractOrderDetails(message: string, menuContext?: string): {
     }
   }
 
-  // Extract item names (basic - can be improved)
+  // Extract item names - IMPROVED to handle multiple items and typos
   const items: string[] = [];
-  const itemKeywords = ['biryani', 'karahi', 'nihari', 'kebab', 'tikka', 'burger', 'samosa', 'naan', 'paratha'];
+  const itemKeywords = [
+    'biryani', 'karahi', 'nihari', 'kebab', 'tikka', 'burger', 'samosa',
+    'naan', 'paratha', 'lassi', 'gulab jamun', 'kheer', 'brownie', 'wings'
+  ];
 
+  // Also check for common typos/variations
+  const itemVariations: Record<string, string> = {
+    'tikky': 'tikka',
+    'tika': 'tikka',
+    'tikki': 'tikka',
+    'samosy': 'samosa',
+    'samosay': 'samosa',
+    'kabab': 'kebab',
+    'kebeb': 'kebab',
+    'karahee': 'karahi',
+    'karhai': 'karahi',
+    'briyani': 'biryani',
+    'biryany': 'biryani',
+    'nan': 'naan',
+    'lasi': 'lassi',
+  };
+
+  // First normalize the message with variations
+  let normalizedMsg = msgLower;
+  for (const [typo, correct] of Object.entries(itemVariations)) {
+    normalizedMsg = normalizedMsg.replace(new RegExp(`\\b${typo}\\b`, 'g'), correct);
+  }
+
+  // Now extract ALL matching items (not just first one)
   for (const keyword of itemKeywords) {
-    if (msgLower.includes(keyword)) {
-      items.push(keyword);
+    if (normalizedMsg.includes(keyword)) {
+      // Avoid duplicates
+      if (!items.includes(keyword)) {
+        items.push(keyword);
+      }
     }
   }
 

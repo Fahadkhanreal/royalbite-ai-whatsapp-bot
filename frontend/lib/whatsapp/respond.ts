@@ -111,57 +111,75 @@ export async function generateReply(
     // Check if user is in middle of an order flow
     const conversationState = getConversationState(conversationUserId);
 
+    // CRITICAL: Allow user to escape order flow if they change topic
+    // If user asks for menu, greeting, help, etc. while in order state, clear it
     if (conversationState?.state === 'awaiting_order_details') {
-      // User is providing order details
-      const extracted = extractOrderDetails(userMessage);
+      const escapingIntents = ['menu_query', 'greeting', 'help', 'timing', 'thanks', 'cancel_order'];
 
-      if (extracted.hasAllDetails) {
-        // All details present, create order
-        try {
-          // Get item details from context (simplified - match by name)
-          const itemName = extracted.items[0]; // First matched item
-          const quantity = extracted.quantity || 1;
-
-          // Fetch item price (check admin menu first, then documents)
-          const dishMatch = await db.query.dishes.findFirst({
-            where: (dishes, { and, eq, ilike }) =>
-              and(
-                ilike(dishes.name, `%${itemName}%`),
-                eq(dishes.isAvailable, true)
-              ),
-          });
-
-          const price = dishMatch ? parseFloat(dishMatch.price) : 250; // Default fallback
-          const displayName = dishMatch ? dishMatch.name : itemName;
-
-          // Create order
-          const orderResult = await createOrder({
-            items: [{ name: displayName, quantity, price }],
-            address: extracted.address!,
-            phoneNumber: conversationUserId,
-          });
-
-          // Clear conversation state
-          clearConversationState(conversationUserId);
-
-          // Return confirmation
-          return formatOrderConfirmation(
-            orderResult.orderNumber,
-            [{ name: displayName, quantity, price }],
-            orderResult.total,
-            extracted.address!
-          );
-        } catch (error) {
-          console.error('Order creation failed:', error);
-          clearConversationState(conversationUserId);
-          return `Sorry, order create karte waqt issue aa gaya. Please try again ya call karein!`;
-        }
+      if (escapingIntents.includes(intent.action)) {
+        // User changed topic - clear order state and process new intent
+        console.info('[RESPOND] User escaped order flow with intent:', intent.action);
+        clearConversationState(conversationUserId);
+        // Continue to normal intent handling below
       } else {
-        // Missing details, ask for them
-        const missing: string[] = [];
-        if (extracted.items.length === 0) missing.push('item name');
-        if (!extracted.quantity) missing.push('quantity');
-        if (!extracted.address) missing.push('address');
+        // User is still in order flow - process order details
+        const extracted = extractOrderDetails(userMessage);
+
+        if (extracted.hasAllDetails) {
+          // All details present, create order
+          try {
+            // Handle multiple items
+            const orderItems: Array<{ name: string; quantity: number; price: number }> = [];
+            let totalPrice = 0;
+
+            const defaultQuantity = extracted.items.length > 1 ? 1 : (extracted.quantity || 1);
+
+            for (const itemName of extracted.items) {
+              // Fetch item price (check admin menu first, then documents)
+              const dishMatch = await db.query.dishes.findFirst({
+                where: (dishes, { and, eq, ilike }) =>
+                  and(
+                    ilike(dishes.name, `%${itemName}%`),
+                    eq(dishes.isAvailable, true)
+                  ),
+              });
+
+              const price = dishMatch ? parseFloat(dishMatch.price) : 250;
+              const displayName = dishMatch ? dishMatch.name : itemName;
+              const quantity = defaultQuantity;
+
+              orderItems.push({ name: displayName, quantity, price });
+              totalPrice += price * quantity;
+            }
+
+            // Create order
+            const orderResult = await createOrder({
+              items: orderItems,
+              address: extracted.address!,
+              phoneNumber: conversationUserId,
+            });
+
+            // Clear conversation state
+            clearConversationState(conversationUserId);
+
+            // Return confirmation
+            return formatOrderConfirmation(
+              orderResult.orderNumber,
+              orderItems,
+              orderResult.total,
+              extracted.address!
+            );
+          } catch (error) {
+            console.error('Order creation failed:', error);
+            clearConversationState(conversationUserId);
+            return `Sorry, order create karte waqt issue aa gaya. Please try again ya call karein!`;
+          }
+        } else {
+          // Missing details, ask for them
+          const missing: string[] = [];
+          if (extracted.items.length === 0) missing.push('item name');
+          if (!extracted.quantity) missing.push('quantity');
+          if (!extracted.address) missing.push('address');
 
         return `Thoda aur detail chahiye 😊\n\nPlease bataiye:\n${
           missing.includes('item name') ? '- Kya order karna hai?\n' : ''
@@ -239,29 +257,41 @@ export async function generateReply(
       if (extracted.hasAllDetails) {
         // User provided everything in one message - process immediately
         try {
-          const itemName = extracted.items[0];
-          const quantity = extracted.quantity || 1;
+          // Handle multiple items if present
+          const orderItems: Array<{ name: string; quantity: number; price: number }> = [];
+          let totalPrice = 0;
 
-          const dishMatch = await db.query.dishes.findFirst({
-            where: (dishes, { and, eq, ilike }) =>
-              and(
-                ilike(dishes.name, `%${itemName}%`),
-                eq(dishes.isAvailable, true)
-              ),
-          });
+          // If multiple items, use quantity 1 for each; if single item, use extracted quantity
+          const defaultQuantity = extracted.items.length > 1 ? 1 : (extracted.quantity || 1);
 
-          const price = dishMatch ? parseFloat(dishMatch.price) : 250;
-          const displayName = dishMatch ? dishMatch.name : itemName;
+          for (const itemName of extracted.items) {
+            // Try to find matching dish
+            const dishMatch = await db.query.dishes.findFirst({
+              where: (dishes, { and, eq, ilike }) =>
+                and(
+                  ilike(dishes.name, `%${itemName}%`),
+                  eq(dishes.isAvailable, true)
+                ),
+            });
 
+            const price = dishMatch ? parseFloat(dishMatch.price) : 250; // Default fallback
+            const displayName = dishMatch ? dishMatch.name : itemName;
+            const quantity = defaultQuantity;
+
+            orderItems.push({ name: displayName, quantity, price });
+            totalPrice += price * quantity;
+          }
+
+          // Create order with all items
           const orderResult = await createOrder({
-            items: [{ name: displayName, quantity, price }],
+            items: orderItems,
             address: extracted.address!,
             phoneNumber: conversationUserId,
           });
 
           return formatOrderConfirmation(
             orderResult.orderNumber,
-            [{ name: displayName, quantity, price }],
+            orderItems,
             orderResult.total,
             extracted.address!
           );
