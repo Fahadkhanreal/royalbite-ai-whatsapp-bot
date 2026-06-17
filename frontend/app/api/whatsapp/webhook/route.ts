@@ -1,5 +1,5 @@
-// WhatsApp Webhook - WATI handler v3.0
-// Force rebuild: 2026-06-13T02:35:00Z
+// WhatsApp Webhook - WATI handler v3.1 - WITH DEDUPLICATION
+// Force rebuild: 2026-06-18T00:00:00Z
 // This file MUST generate a new webpack hash
 import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
 import { generateReply } from '@/lib/whatsapp/respond';
@@ -8,6 +8,28 @@ import { detectIntent } from '@/lib/whatsapp/intent';
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 30; // Force new deployment
+
+// MESSAGE DEDUPLICATION - Prevent processing same message twice
+const processedMessages = new Map<string, number>();
+const MESSAGE_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+
+function cleanupOldMessages() {
+  const now = Date.now();
+  for (const [msgId, timestamp] of processedMessages.entries()) {
+    if (now - timestamp > MESSAGE_EXPIRY_MS) {
+      processedMessages.delete(msgId);
+    }
+  }
+}
+
+function isMessageProcessed(messageId: string): boolean {
+  cleanupOldMessages();
+  return processedMessages.has(messageId);
+}
+
+function markMessageProcessed(messageId: string): void {
+  processedMessages.set(messageId, Date.now());
+}
 
 export async function GET() {
   return new Response(JSON.stringify({ status: 'ok' }), {
@@ -20,6 +42,7 @@ type ParsedMessage = {
   from: string;
   msgText: string;
   eventType?: string;
+  messageId?: string;
 };
 
 function getString(value: unknown): string {
@@ -30,6 +53,17 @@ function parseWatiMessage(body: Record<string, any>): ParsedMessage {
   const data = body.data || body.payload || body.messageData || {};
   const nestedMessage = data.message || body.message || {};
   const textObject = body.text || data.text || nestedMessage.text || {};
+
+  // Extract message ID (for deduplication)
+  const messageId =
+    getString(body.id) ||
+    getString(body.messageId) ||
+    getString(body.msgId) ||
+    getString(data.id) ||
+    getString(data.messageId) ||
+    getString(data.msgId) ||
+    getString(nestedMessage.id) ||
+    getString(nestedMessage.messageId);
 
   // Extract phone number
   const from =
@@ -80,6 +114,7 @@ function parseWatiMessage(body: Record<string, any>): ParsedMessage {
     from,
     msgText,
     eventType: getString(body.eventType) || getString(body.type),
+    messageId,
   };
 }
 
@@ -112,6 +147,30 @@ export async function POST(req: Request) {
     const parsed = parseWatiMessage(body);
     from = parsed.from;
     msgText = parsed.msgText;
+
+    // DEDUPLICATION CHECK - If no messageId from WATI, create one
+    let messageId = parsed.messageId;
+    if (!messageId) {
+      // Fallback: Create unique ID from phone + first 50 chars + timestamp (rounded to 2 seconds)
+      const timestamp = Math.floor(Date.now() / 2000); // 2-second window for duplicates
+      messageId = `${from}-${msgText.slice(0, 50)}-${timestamp}`;
+    }
+
+    // Check if already processed
+    if (isMessageProcessed(messageId)) {
+      console.info('[WEBHOOK] DUPLICATE MESSAGE BLOCKED:', {
+        messageId: messageId.slice(0, 30),
+        from: `${from.slice(0, 6)}xxx`,
+        message: msgText.slice(0, 30),
+      });
+      return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    // Mark as processing NOW (before any async work)
+    markMessageProcessed(messageId);
 
     // Debug: Log the actual text field to see what WATI sends
     console.info('[WEBHOOK] Raw payload analysis:', {
