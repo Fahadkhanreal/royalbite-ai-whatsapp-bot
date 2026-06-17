@@ -12,11 +12,11 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 30; // Force new deployment
 
-// Clean up old processed messages (older than 5 minutes)
+// Clean up old processed messages (older than 60 seconds - webhook duplicates arrive within seconds)
 async function cleanupOldMessages() {
   try {
     await db.delete(processedWebhooks)
-      .where(sql`${processedWebhooks.processedAt} < NOW() - INTERVAL '5 minutes'`);
+      .where(sql`${processedWebhooks.processedAt} < NOW() - INTERVAL '60 seconds'`);
   } catch (error) {
     console.error('[WEBHOOK] Cleanup failed:', error);
   }
@@ -139,12 +139,23 @@ export async function POST(req: Request) {
     from = parsed.from;
     msgText = parsed.msgText;
 
-    // DEDUPLICATION CHECK - If no messageId from WATI, create one
+    // CRITICAL: Filter event types - only process actual user messages
+    const eventType = parsed.eventType?.toLowerCase();
+    if (eventType && !['message', 'message_received', 'text', ''].includes(eventType)) {
+      console.info('[WEBHOOK] Ignoring non-message event:', eventType);
+      return new Response(JSON.stringify({ status: 'ok', reason: 'ignored_event_type' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    // DEDUPLICATION CHECK - Create stable messageId (NO TIMESTAMP!)
     let messageId = parsed.messageId;
     if (!messageId) {
-      // Fallback: Create unique ID from phone + first 50 chars + timestamp (rounded to 2 seconds)
-      const timestamp = Math.floor(Date.now() / 2000); // 2-second window for duplicates
-      messageId = `${from}-${msgText.slice(0, 50)}-${timestamp}`;
+      // CRITICAL FIX: Use phone + message text ONLY (no timestamp)
+      // Same message from same user = ALWAYS same ID
+      // This blocks ALL duplicate webhooks for the same message
+      messageId = `${from}-${msgText}`;
     }
 
     // DATABASE DEDUPLICATION CHECK - Works across all Vercel instances
