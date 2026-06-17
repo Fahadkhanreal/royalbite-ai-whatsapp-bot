@@ -123,7 +123,7 @@ export async function generateReply(
         // Continue to normal intent handling below
       } else {
         // User is still in order flow - process order details
-        const extracted = extractOrderDetails(userMessage);
+        const extracted = await extractOrderDetails(userMessage);
 
         if (extracted.hasAllDetails) {
           // All details present, create order
@@ -252,7 +252,7 @@ export async function generateReply(
 
     // Handle order intent
     if (intent.action === 'order') {
-      const extracted = extractOrderDetails(userMessage);
+      const extracted = await extractOrderDetails(userMessage);
 
       if (extracted.hasAllDetails) {
         // User provided everything in one message - process immediately

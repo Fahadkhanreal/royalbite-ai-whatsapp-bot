@@ -5,6 +5,7 @@
 import { db } from '@/lib/db';
 import { orders, orderItems, dishes } from '@/lib/db/schema';
 import { eq, ilike } from 'drizzle-orm';
+import { fuzzyExtractItems } from './fuzzy-match';
 
 export interface OrderDetails {
   items: Array<{
@@ -20,13 +21,14 @@ export interface OrderDetails {
 /**
  * Extract order details from user message
  * Looks for: quantity, item names, address
+ * Uses fuzzy matching for menu items (handles typos automatically)
  */
-export function extractOrderDetails(message: string, menuContext?: string): {
+export async function extractOrderDetails(message: string, menuContext?: string): Promise<{
   items: string[];
   quantity: number | null;
   address: string | null;
   hasAllDetails: boolean;
-} {
+}> {
   const msgLower = message.toLowerCase();
 
   // Extract quantity (look for numbers)
@@ -70,42 +72,66 @@ export function extractOrderDetails(message: string, menuContext?: string): {
     }
   }
 
-  // Extract item names - IMPROVED to handle multiple items and typos
-  const items: string[] = [];
-  const itemKeywords = [
-    'biryani', 'karahi', 'nihari', 'kebab', 'tikka', 'burger', 'samosa',
-    'naan', 'paratha', 'lassi', 'gulab jamun', 'kheer', 'brownie', 'wings'
-  ];
+  // Extract item names using FUZZY MATCHING against actual menu
+  let items: string[] = [];
 
-  // Also check for common typos/variations
-  const itemVariations: Record<string, string> = {
-    'tikky': 'tikka',
-    'tika': 'tikka',
-    'tikki': 'tikka',
-    'samosy': 'samosa',
-    'samosay': 'samosa',
-    'kabab': 'kebab',
-    'kebeb': 'kebab',
-    'karahee': 'karahi',
-    'karhai': 'karahi',
-    'briyani': 'biryani',
-    'biryany': 'biryani',
-    'nan': 'naan',
-    'lasi': 'lassi',
-  };
+  try {
+    // Fetch available menu items from database
+    const availableDishes = await db.query.dishes.findMany({
+      where: (dishes, { eq }) => eq(dishes.isAvailable, true),
+    });
 
-  // First normalize the message with variations
-  let normalizedMsg = msgLower;
-  for (const [typo, correct] of Object.entries(itemVariations)) {
-    normalizedMsg = normalizedMsg.replace(new RegExp(`\\b${typo}\\b`, 'g'), correct);
-  }
+    const menuItemNames = availableDishes.map(dish => dish.name);
 
-  // Now extract ALL matching items (not just first one)
-  for (const keyword of itemKeywords) {
-    if (normalizedMsg.includes(keyword)) {
-      // Avoid duplicates
-      if (!items.includes(keyword)) {
-        items.push(keyword);
+    // Use fuzzy matching to extract items (handles typos automatically!)
+    items = fuzzyExtractItems(message, menuItemNames, 0.70);
+
+    console.info('[ORDER-EXTRACT] Fuzzy match results:', {
+      userInput: message.slice(0, 100),
+      availableItems: menuItemNames.length,
+      matchedItems: items,
+    });
+  } catch (error) {
+    console.error('[ORDER-EXTRACT] Fuzzy matching failed, using fallback:', error);
+
+    // Fallback: Use old keyword-based approach with typo tolerance
+    const itemKeywords = [
+      'biryani', 'karahi', 'nihari', 'kebab', 'tikka', 'burger', 'samosa',
+      'naan', 'paratha', 'lassi', 'gulab jamun', 'kheer', 'brownie', 'wings'
+    ];
+
+    // Also check for common typos/variations
+    const itemVariations: Record<string, string> = {
+      'tikky': 'tikka',
+      'tika': 'tikka',
+      'tikki': 'tikka',
+      'samosy': 'samosa',
+      'samosay': 'samosa',
+      'kabab': 'kebab',
+      'kebeb': 'kebab',
+      'karahee': 'karahi',
+      'karhai': 'karahi',
+      'briyani': 'biryani',
+      'biryany': 'biryani',
+      'biryan': 'biryani',
+      'bryani': 'biryani',
+      'nan': 'naan',
+      'lasi': 'lassi',
+    };
+
+    // First normalize the message with variations
+    let normalizedMsg = msgLower;
+    for (const [typo, correct] of Object.entries(itemVariations)) {
+      normalizedMsg = normalizedMsg.replace(new RegExp(`\\b${typo}\\b`, 'g'), correct);
+    }
+
+    // Now extract ALL matching items (not just first one)
+    for (const keyword of itemKeywords) {
+      if (normalizedMsg.includes(keyword)) {
+        // Avoid duplicates
+        if (!items.includes(keyword)) {
+          items.push(keyword);
+        }
       }
     }
   }
