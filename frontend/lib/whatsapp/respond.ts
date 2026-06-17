@@ -114,15 +114,20 @@ export async function generateReply(
     // CRITICAL: Allow user to escape order flow if they change topic
     // If user asks for menu, greeting, help, etc. while in order state, clear it
     if (conversationState?.state === 'awaiting_order_details') {
-      const escapingIntents = ['menu_query', 'greeting', 'help', 'timing', 'thanks', 'cancel_order'];
+      // Check if user is EXPLICITLY asking for help/menu (not just mentioning items)
+      const escapingKeywords = ['menu', 'help', 'timings', 'cancel', 'kya hai', 'batao', 'dekhao'];
+      const isEscaping = escapingKeywords.some(keyword => userMessage.toLowerCase().includes(keyword)) &&
+                        !userMessage.toLowerCase().match(/\d+\s*(tikka|samosa|biryani|kebab|karahi)/i);
 
-      if (escapingIntents.includes(intent.action)) {
-        // User changed topic - clear order state and process new intent
+      if (isEscaping && ['menu_query', 'greeting', 'help', 'timing', 'thanks'].includes(intent.action)) {
+        // User explicitly asked for menu/help - clear order state and process new intent
         console.info('[RESPOND] User escaped order flow with intent:', intent.action);
         clearConversationState(conversationUserId);
         // Continue to normal intent handling below
       } else {
         // User is still in order flow - process order details
+        // IGNORE intent detection here - treat everything as order details
+        console.info('[RESPOND] Processing order details (ignoring intent detection)');
         const extracted = await extractOrderDetails(userMessage);
 
         if (extracted.hasAllDetails) {
