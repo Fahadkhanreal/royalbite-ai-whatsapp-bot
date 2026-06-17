@@ -8,11 +8,23 @@ import { detectIntent } from '@/lib/whatsapp/intent';
 import { generateReply } from '@/lib/whatsapp/respond';
 import { sendWhatsAppMessage } from '@/lib/whatsapp/client';
 import { isInCooldown, recordResponse, getCooldownRemaining } from '@/lib/whatsapp/cooldown';
-import { isMessageProcessed, markMessageProcessed } from '@/lib/whatsapp/message-dedup';
+import { db } from '@/lib/db';
+import { processedWebhooks } from '@/lib/db/schema';
+import { eq, sql } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 30;
+
+// Clean up old processed messages (older than 60 seconds)
+async function cleanupOldMessages() {
+  try {
+    await db.delete(processedWebhooks)
+      .where(sql`${processedWebhooks.processedAt} < NOW() - INTERVAL '60 seconds'`);
+  } catch (error) {
+    console.error('[WEBHOOK-V3] Cleanup failed:', error);
+  }
+}
 
 interface GreenAPIWebhook {
   typeWebhook: string;
@@ -90,26 +102,49 @@ export async function POST(req: Request) {
       return NextResponse.json({ status: 'ignored', reason: 'empty_message' });
     }
 
-    // Check for duplicate messages to prevent double-processing
-    const messageId = body.idMessage;
-    if (messageId && isMessageProcessed(messageId)) {
-      console.warn('[WEBHOOK-V3] 🔁 Duplicate message detected:', {
-        messageId,
-        from,
-        text: msgText.slice(0, 50),
-        reason: 'Message already processed (Green API duplicate webhook)'
-      });
-      return NextResponse.json({
-        status: 'ignored',
-        reason: 'duplicate_message',
-        messageId
-      });
+    // DATABASE DEDUPLICATION - Works across all Vercel instances
+    // Create stable messageId: Use Green API's idMessage OR phone+message
+    let messageId = body.idMessage;
+    if (!messageId) {
+      // Fallback: phone + message text (NO timestamp - same message = same ID)
+      messageId = `${from}-${msgText}`;
     }
 
-    // Mark message as processed EARLY to prevent race conditions
-    if (messageId) {
-      markMessageProcessed(messageId);
-      console.info('[WEBHOOK-V3] ✓ Message marked as processed:', messageId);
+    try {
+      // Check if already processed in database
+      const existing = await db.query.processedWebhooks.findFirst({
+        where: eq(processedWebhooks.messageId, messageId),
+      });
+
+      if (existing) {
+        console.warn('[WEBHOOK-V3] 🔁 DUPLICATE BLOCKED (DATABASE):', {
+          messageId: messageId.slice(0, 30),
+          from,
+          text: msgText.slice(0, 50),
+          processedAt: existing.processedAt,
+          reason: 'Message already processed (duplicate webhook from Green API)'
+        });
+        return NextResponse.json({
+          status: 'ignored',
+          reason: 'duplicate_message',
+          messageId
+        });
+      }
+
+      // Mark as processed NOW (insert BEFORE any async work)
+      await db.insert(processedWebhooks).values({
+        messageId,
+        phoneNumber: from,
+        messagePreview: msgText.slice(0, 100),
+      });
+
+      console.info('[WEBHOOK-V3] ✓ Message marked as processed in database:', messageId.slice(0, 30));
+
+      // Cleanup old messages (async, don't wait)
+      cleanupOldMessages().catch(err => console.error('[WEBHOOK-V3] Cleanup error:', err));
+    } catch (dedupError) {
+      console.error('[WEBHOOK-V3] Deduplication check failed:', dedupError);
+      // If dedup fails, continue anyway (better to risk duplicate than block all messages)
     }
 
     // Detect intent (menu, reservation, hours, etc.)
