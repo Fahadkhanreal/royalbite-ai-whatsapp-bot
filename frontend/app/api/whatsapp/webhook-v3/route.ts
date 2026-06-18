@@ -103,12 +103,9 @@ export async function POST(req: Request) {
     }
 
     // DATABASE DEDUPLICATION - Works across all Vercel instances
-    // Create stable messageId: Use Green API's idMessage OR phone+message
-    let messageId = body.idMessage;
-    if (!messageId) {
-      // Fallback: phone + message text (NO timestamp - same message = same ID)
-      messageId = `${from}-${msgText}`;
-    }
+    // CRITICAL: Always use phone+message for stable ID (ignore Green API idMessage)
+    // Green API may send multiple webhooks with DIFFERENT idMessage for same message!
+    const messageId = `${from}-${msgText}`;
 
     try {
       // Check if already processed in database
