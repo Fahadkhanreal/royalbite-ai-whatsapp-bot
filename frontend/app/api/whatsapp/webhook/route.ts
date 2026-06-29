@@ -182,7 +182,7 @@ export async function POST(req: Request) {
           LIMIT 1
         `);
 
-        const existingRow = existing.rows?.[0];
+        const existingRow = existing.rows?.[0] as { id: string; processed_at: string } | undefined;
         if (existingRow) {
           const createdAt = new Date(existingRow.processed_at).getTime();
           const ageSeconds = (Date.now() - createdAt) / 1000;
