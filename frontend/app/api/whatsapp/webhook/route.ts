@@ -158,31 +158,29 @@ export async function POST(req: Request) {
       messageId = `${from}-${msgText}`;
     }
 
-    // DATABASE DEDUPLICATION CHECK - Works across all Vercel instances
+    // ATOMIC DATABASE DEDUPLICATION - Raw SQL INSERT ... ON CONFLICT DO NOTHING
+    // Fixes race condition: SELECT+INSERT gap allowed duplicates when 2 requests arrive simultaneously
+    // PostgreSQL unique constraint + ON CONFLICT handles this atomically at DB level
     try {
-      const existing = await db.query.processedWebhooks.findFirst({
-        where: eq(processedWebhooks.messageId, messageId),
-      });
+      const result = await db.execute(sql`
+        INSERT INTO processed_webhooks (message_id, phone_number, message_preview)
+        VALUES (${messageId}, ${from}, ${msgText.slice(0, 100)})
+        ON CONFLICT (message_id) DO NOTHING
+        RETURNING id
+      `);
 
-      if (existing) {
-        console.info('[WEBHOOK] DUPLICATE MESSAGE BLOCKED (DATABASE):', {
+      // If no row returned, this is a duplicate (unique constraint blocked the insert)
+      if (!result.rows || result.rows.length === 0) {
+        console.info('[WEBHOOK] DUPLICATE MESSAGE BLOCKED (ATOMIC DB):', {
           messageId: messageId.slice(0, 30),
           from: `${from.slice(0, 6)}xxx`,
           message: msgText.slice(0, 30),
-          processedAt: existing.processedAt,
         });
         return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked' }), {
           status: 200,
           headers: { 'content-type': 'application/json' },
         });
       }
-
-      // Mark as processing NOW (insert into database BEFORE any async work)
-      await db.insert(processedWebhooks).values({
-        messageId,
-        phoneNumber: from,
-        messagePreview: msgText.slice(0, 100),
-      });
 
       console.info('[WEBHOOK] Message marked as processing in database:', {
         messageId: messageId.slice(0, 30),
@@ -191,7 +189,7 @@ export async function POST(req: Request) {
       // Cleanup old messages (async, don't wait)
       cleanupOldMessages().catch(err => console.error('[WEBHOOK] Cleanup error:', err));
     } catch (dedupError) {
-      console.error('[WEBHOOK] Deduplication check failed:', dedupError);
+      console.error('[WEBHOOK] Deduplication failed:', dedupError);
       // If dedup fails, continue anyway (better to risk duplicate than block all messages)
     }
 
