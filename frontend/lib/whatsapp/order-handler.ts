@@ -132,10 +132,21 @@ export async function extractOrderDetails(message: string, menuContext?: string)
   // "2 tikka 3 biryani" → tikka gets 2, biryani gets 3
   const items: ExtractedItem[] = rawItemNames.map(name => {
     const nameLower = name.toLowerCase();
-    // Find the number IMMEDIATELY before this item name
-    // Patterns: "2 tikka", "2tikka", "1plate biryani", "3piece chicken"
-    const regex = new RegExp(`(\\d+)\\s*(plate|piece|pc|x)?\\s*${nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
-    const match = msgLower.match(regex);
+    // Extract short name: last word of item name (e.g., "biryani" from "Sindhi Biryani")
+    // This handles "3 biryani" matching "Sindhi Biryani"
+    const nameParts = nameLower.split(/\s+/);
+    const shortName = nameParts[nameParts.length - 1];
+
+    // Try FULL name first ("sindhi biryani")
+    let regex = new RegExp(`(\\d+)\\s*(plate|piece|pc|x)?\\s*${nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+    let match = msgLower.match(regex);
+
+    // If full name didn't match, try LAST WORD only ("biryani")
+    if (!match && shortName.length >= 4) {
+      regex = new RegExp(`(\\d+)\\s*(plate|piece|pc|x)?\\s*${shortName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+      match = msgLower.match(regex);
+    }
+
     const qty = match ? parseInt(match[1], 10) : 1;
     return { name, quantity: qty };
   });

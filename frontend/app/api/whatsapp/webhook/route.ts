@@ -7,6 +7,7 @@ import { detectIntent } from '@/lib/whatsapp/intent';
 import { db } from '@/lib/db';
 import { processedWebhooks } from '@/lib/db/schema';
 import { eq, sql } from 'drizzle-orm';
+import { isMessageProcessed, markMessageProcessed } from '@/lib/whatsapp/message-dedup';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -158,9 +159,24 @@ export async function POST(req: Request) {
       messageId = `${from}-${msgText}`;
     }
 
-    // ATOMIC DATABASE DEDUPLICATION - Raw SQL INSERT ... ON CONFLICT DO NOTHING
-    // Fixes race condition: SELECT+INSERT gap allowed duplicates when 2 requests arrive simultaneously
-    // PostgreSQL unique constraint + ON CONFLICT handles this atomically at DB level
+    // LAYER 1: IN-MEMORY DEDUP - Blazing fast, works for same-Vercel-instance duplicates
+    // Green API often sends duplicates within milliseconds to the same instance
+    const dedupKey = `${from}:${msgText}`;
+    if (isMessageProcessed(dedupKey)) {
+      console.info('[WEBHOOK] DUPLICATE BLOCKED (IN-MEMORY):', {
+        from: `${from.slice(0, 6)}xxx`,
+        message: msgText.slice(0, 30),
+      });
+      return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked_in_memory' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+    markMessageProcessed(dedupKey);
+
+    // LAYER 2: ATOMIC DATABASE DEDUP - Works across all Vercel instances
+    // Raw SQL INSERT ... ON CONFLICT DO NOTHING fixes race condition
+    // PostgreSQL unique constraint handles this atomically at DB level
     //
     // CRITICAL: messageId = `${from}-${msgText}` means same user saying "hi" again reuses same ID.
     // If old entry exists from hours ago, we must ALLOW re-processing, not block it forever.

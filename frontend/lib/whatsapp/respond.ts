@@ -112,6 +112,15 @@ export async function generateReply(
     // Check if user is in middle of an order flow
     const conversationState = getConversationState(conversationUserId);
 
+    // CRITICAL: If user is in order flow AND this message is EXACTLY the same as
+    // the one that triggered the state → it's a duplicate webhook, DON'T re-process
+    if (conversationState?.state === 'awaiting_order_details' &&
+        conversationState?.context?.originalMessage === userMessage) {
+      console.info('[RESPOND] Duplicate message detected via conversation state, sending same response as before');
+      // Return the same form again — don't process differently
+      return `Bilkul order le raha hoon! 😊\n\nMujhe yeh details de dijiye:\n• Kya order karna hai? (item name)\n• Kitne plate/piece?\n• Aapka delivery address?\n\nExample: "2 tikka 3 biryani, House 123 Block 5 Gulshan"`;
+    }
+
     // CRITICAL: Allow user to escape order flow if they change topic
     // If user asks for menu, greeting, help, etc. while in order state, clear it
     if (conversationState?.state === 'awaiting_order_details') {
@@ -301,7 +310,9 @@ export async function generateReply(
         }
       } else {
         // Missing details - enter conversation state and ask
-        setConversationState(conversationUserId, 'awaiting_order_details', {});
+        setConversationState(conversationUserId, 'awaiting_order_details', {
+          originalMessage: userMessage,
+        });
 
         return `Bilkul order le raha hoon! 😊\n\nMujhe yeh details de dijiye:\n• Kya order karna hai? (item name)\n• Kitne plate/piece?\n• Aapka delivery address?\n\nExample: "2 tikka 3 biryani, House 123 Block 5 Gulshan"`;
       }

@@ -98,26 +98,62 @@ export function findBestMatch(
 /**
  * Extract menu items from user message using fuzzy matching
  * Works with any items in database (current + future)
+ *
+ * Strategy:
+ * 1. Check if any FULL menu item name appears in the user message (e.g., "Chicken Tikka" in "2 chicken tikka")
+ * 2. Check if any message word is a substring OF a menu item (e.g., "biryani" → "Sindhi Biryani")
+ * 3. Word-by-word Levenshtein similarity for typos
  */
 export function fuzzyExtractItems(
   userMessage: string,
   availableItems: string[],
   threshold: number = 0.75
 ): string[] {
-  const words = userMessage.toLowerCase().split(/[\s,]+/);
+  const msgLower = userMessage.toLowerCase().trim();
+  const words = msgLower.split(/[\s,]+/);
   const matchedItems: string[] = [];
 
-  for (const word of words) {
-    // Skip very short words and numbers
-    if (word.length < 3 || /^\d+$/.test(word)) {
+  // Step 1: Check full menu item names against complete message
+  // Fix: "biryani" should match "Sindhi Biryani", "tikka" should match "Chicken Tikka"
+  for (const item of availableItems) {
+    const itemLower = item.toLowerCase().trim();
+    // Check: does the FULL user message contain this menu item name?
+    if (msgLower.includes(itemLower)) {
+      if (!matchedItems.includes(item)) {
+        matchedItems.push(item);
+        console.info(`[FUZZY-MATCH] Exact phrase found: "${item}" in message`);
+      }
       continue;
     }
+    // Check: does any word from message exist AS PART of this item name?
+    // e.g., word "biryani" is contained in "Sindhi Biryani"
+    for (const word of words) {
+      if (word.length < 3 || /^\d+$/.test(word)) continue;
+      if (itemLower.includes(word) && !matchedItems.includes(item)) {
+        // Use substring ratio: shorter/longer
+        const ratio = word.length / itemLower.length;
+        if (ratio >= 0.30) { // Low threshold: even "tea" in "Chai Tea" should match
+          matchedItems.push(item);
+          console.info(`[FUZZY-MATCH] Word substring: "${word}" → "${item}" (ratio: ${ratio.toFixed(2)})`);
+          break;
+        }
+      }
+    }
+  }
+
+  // Step 2: Word-by-word Levenshtein for typos (only for unmatched items)
+  for (const word of words) {
+    if (word.length < 3 || /^\d+$/.test(word)) continue;
+
+    // Skip if this word already helped match an item
+    const alreadyMatched = matchedItems.some(item => item.toLowerCase().includes(word));
+    if (alreadyMatched && matchedItems.length > 0) continue;
 
     const match = findBestMatch(word, availableItems, threshold);
 
     if (match && !matchedItems.includes(match.match)) {
       matchedItems.push(match.match);
-      console.info(`[FUZZY-MATCH] "${word}" → "${match.match}" (similarity: ${match.similarity.toFixed(2)})`);
+      console.info(`[FUZZY-MATCH] Levenshtein: "${word}" → "${match.match}" (similarity: ${match.similarity.toFixed(2)})`);
     }
   }
 
