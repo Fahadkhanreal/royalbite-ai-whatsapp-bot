@@ -124,19 +124,33 @@ export async function generateReply(
     // CRITICAL: Allow user to escape order flow if they change topic
     // If user asks for menu, greeting, help, etc. while in order state, clear it
     if (conversationState?.state === 'awaiting_order_details') {
-      // Check if user is EXPLICITLY asking for help/menu/greeting (not just mentioning items)
-      const escapingKeywords = ['menu', 'help', 'timings', 'cancel', 'kya hai', 'batao', 'dekhao',
-                                'hi', 'hello', 'hey', 'salam', 'assalamo', 'good morning', 'good evening',
-                                'thanks', 'thank you', 'shukria', 'thankyou'];
-      const isEscaping = escapingKeywords.some(keyword => userMessage.toLowerCase().includes(keyword)) &&
-                        !userMessage.toLowerCase().match(/\d+\s*(tikka|samosa|biryani|kebab|karahi)/i);
+      // CRITICAL: If message contains greeting keywords + numbers, user is BOTH greeting AND ordering
+      // In this case, extract order details and create order (don't escape)
+      const msgLower = userMessage.toLowerCase();
+      const hasGreeting = ['hi', 'hello', 'hey', 'salam', 'assalamo'].some(k => msgLower.includes(k));
+      const hasItemsWithNumbers = msgLower.match(/\d+\s*(tikka|samosa|biryani|kebab|karahi)/i);
 
-      if (isEscaping && ['menu_query', 'greeting', 'help', 'timing', 'thanks'].includes(intent.action)) {
-        // User explicitly asked for menu/help - clear order state and process new intent
-        console.info('[RESPOND] User escaped order flow with intent:', intent.action);
+      // If message has greeting keywords but NO actual order items → user wants to escape order flow
+      if (hasGreeting && !hasItemsWithNumbers) {
+        console.info('[RESPOND] User escaped order flow with greeting (no items):', intent.action);
         clearConversationState(conversationUserId);
-        // Continue to normal intent handling below
+        // Continue to normal greeting handler below
+      } else if (hasGreeting && hasItemsWithNumbers) {
+        // User mixed greeting + order items → process order, don't escape
+        console.info('[RESPOND] Mixed greeting+order, processing order');
+        // Fall through to order processing below
       } else {
+        // Check if user is EXPLICITLY asking for help/menu (not just mentioning items)
+        const escapingKeywords = ['menu', 'help', 'timings', 'cancel', 'kya hai', 'batao', 'dekhao',
+                                  'hi', 'hello', 'hey', 'salam', 'assalamo', 'good morning', 'good evening',
+                                  'thanks', 'thank you', 'shukria', 'thankyou'];
+        const isEscaping = escapingKeywords.some(keyword => msgLower.includes(keyword)) &&
+                          !hasItemsWithNumbers;
+
+        if (isEscaping && ['menu_query', 'greeting', 'help', 'timing', 'thanks'].includes(intent.action)) {
+          console.info('[RESPOND] User escaped order flow with intent:', intent.action);
+          clearConversationState(conversationUserId);
+        } else {
         // User is still in order flow - process order details
         // IGNORE intent detection here - treat everything as order details
         console.info('[RESPOND] Processing order details (ignoring intent detection)');

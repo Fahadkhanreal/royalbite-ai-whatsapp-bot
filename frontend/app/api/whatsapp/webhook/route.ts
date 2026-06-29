@@ -150,18 +150,18 @@ export async function POST(req: Request) {
       });
     }
 
-    // DEDUPLICATION CHECK - Create stable messageId (NO TIMESTAMP!)
-    let messageId = parsed.messageId;
-    if (!messageId) {
-      // CRITICAL FIX: Use phone + message text ONLY (no timestamp)
-      // Same message from same user = ALWAYS same ID
-      // This blocks ALL duplicate webhooks for the same message
-      messageId = `${from}-${msgText}`;
-    }
+    // DEDUPLICATION CHECK - ALWAYS use phone+message text ONLY (NEVER use Green API's messageId)
+    // CRITICAL: Green API sends DIFFERENT messageId values for the same user message on duplicate webhooks
+    // Using phone+text guarantees same ID for same message, blocking ALL duplicates
+    // Normalize text so subtle whitespace/unicode differences don't bypass dedup
+    const normalizedText = msgText.replace(/\s+/g, ' ').trim();
+    const messageId = `${from}-${normalizedText}`;
 
     // LAYER 1: IN-MEMORY DEDUP - Blazing fast, works for same-Vercel-instance duplicates
     // Green API often sends duplicates within milliseconds to the same instance
-    const dedupKey = `${from}:${msgText}`;
+    // CRITICAL: Use normalized text for dedupKey too, so whitespace differences don't bypass it
+    const normalizedDedup = msgText.replace(/\s+/g, ' ').trim();
+    const dedupKey = `${from}:${normalizedDedup}`;
     if (isMessageProcessed(dedupKey)) {
       console.info('[WEBHOOK] DUPLICATE BLOCKED (IN-MEMORY):', {
         from: `${from.slice(0, 6)}xxx`,
@@ -180,8 +180,9 @@ export async function POST(req: Request) {
     //
     // CRITICAL: messageId = `${from}-${msgText}` means same user saying "hi" again reuses same ID.
     // If old entry exists from hours ago, we must ALLOW re-processing, not block it forever.
+    // Moved BEFORE message processing to minimize race condition window
     try {
-      const result = await db.execute(sql`
+      const dbResult = await db.execute(sql`
         INSERT INTO processed_webhooks (message_id, phone_number, message_preview)
         VALUES (${messageId}, ${from}, ${msgText.slice(0, 100)})
         ON CONFLICT (message_id) DO NOTHING
@@ -189,7 +190,7 @@ export async function POST(req: Request) {
       `);
 
       // If no row returned, this is a potential duplicate (unique constraint blocked the insert)
-      if (!result.rows || result.rows.length === 0) {
+      if (!dbResult.rows || dbResult.rows.length === 0) {
         // But it could be an OLD entry from a prior session, not a genuine webhook duplicate
         // Check when the existing entry was created
         const existing = await db.execute(sql`
@@ -210,21 +211,17 @@ export async function POST(req: Request) {
               messageId: messageId.slice(0, 30),
               ageSeconds: Math.round(ageSeconds),
             });
-
             await db.execute(sql`
               DELETE FROM processed_webhooks WHERE message_id = ${messageId}
             `);
-
             await db.execute(sql`
               INSERT INTO processed_webhooks (message_id, phone_number, message_preview)
               VALUES (${messageId}, ${from}, ${msgText.slice(0, 100)})
             `);
           } else {
             // Recent entry (< 2 min) — genuine webhook duplicate, block it
-            console.info('[WEBHOOK] DUPLICATE MESSAGE BLOCKED (ATOMIC DB):', {
+            console.info('[WEBHOOK] DUPLICATE BLOCKED (ATOMIC DB):', {
               messageId: messageId.slice(0, 30),
-              from: `${from.slice(0, 6)}xxx`,
-              message: msgText.slice(0, 30),
               ageSeconds: Math.round(ageSeconds),
             });
             return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked' }), {
@@ -233,7 +230,6 @@ export async function POST(req: Request) {
             });
           }
         } else {
-          // Shouldn't happen, but just in case
           console.warn('[WEBHOOK] Conflict but no existing row found, skipping:', messageId.slice(0, 30));
           return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_unknown' }), {
             status: 200,
@@ -242,15 +238,9 @@ export async function POST(req: Request) {
         }
       }
 
-      console.info('[WEBHOOK] Message marked as processing in database:', {
-        messageId: messageId.slice(0, 30),
-      });
-
-      // Cleanup old messages (async, don't wait)
-      cleanupOldMessages().catch(err => console.error('[WEBHOOK] Cleanup error:', err));
+      console.info('[WEBHOOK] Message ID registered in DB:', messageId.slice(0, 30));
     } catch (dedupError) {
-      console.error('[WEBHOOK] Deduplication failed:', dedupError);
-      // If dedup fails, continue anyway (better to risk duplicate than block all messages)
+      console.error('[WEBHOOK] DB dedup failed, continuing:', dedupError);
     }
 
     // Debug: Log the actual text field to see what WATI sends

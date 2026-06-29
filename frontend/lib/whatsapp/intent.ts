@@ -46,7 +46,8 @@ const INTENT_KEYWORDS: Record<IntentAction, string[]> = {
   ],
   thanks: [
     'thanks', 'thank you', 'thankyou', 'shukria', 'thanks a lot', 'appreciate',
-    'thank', 'ty', 'thx', 'great',
+    'thank', 'ty', 'thx', 'great', 'thnks', 'thnku', 'thanku', 'tnx', 'tanks',
+    'thnx', 'welldone', 'good', 'nice',
   ],
   help: [
     'help', 'how', 'what can you', 'options', 'support', 'guide', 'tutorial',
