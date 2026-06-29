@@ -12,11 +12,11 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 30; // Force new deployment
 
-// Clean up old processed messages (older than 60 seconds - webhook duplicates arrive within seconds)
+// Clean up old processed messages (older than 5 minutes - long enough for all duplicates to arrive, short enough to prevent table bloat)
 async function cleanupOldMessages() {
   try {
     await db.delete(processedWebhooks)
-      .where(sql`${processedWebhooks.processedAt} < NOW() - INTERVAL '60 seconds'`);
+      .where(sql`${processedWebhooks.processedAt} < NOW() - INTERVAL '5 minutes'`);
   } catch (error) {
     console.error('[WEBHOOK] Cleanup failed:', error);
   }
@@ -161,6 +161,9 @@ export async function POST(req: Request) {
     // ATOMIC DATABASE DEDUPLICATION - Raw SQL INSERT ... ON CONFLICT DO NOTHING
     // Fixes race condition: SELECT+INSERT gap allowed duplicates when 2 requests arrive simultaneously
     // PostgreSQL unique constraint + ON CONFLICT handles this atomically at DB level
+    //
+    // CRITICAL: messageId = `${from}-${msgText}` means same user saying "hi" again reuses same ID.
+    // If old entry exists from hours ago, we must ALLOW re-processing, not block it forever.
     try {
       const result = await db.execute(sql`
         INSERT INTO processed_webhooks (message_id, phone_number, message_preview)
@@ -169,17 +172,58 @@ export async function POST(req: Request) {
         RETURNING id
       `);
 
-      // If no row returned, this is a duplicate (unique constraint blocked the insert)
+      // If no row returned, this is a potential duplicate (unique constraint blocked the insert)
       if (!result.rows || result.rows.length === 0) {
-        console.info('[WEBHOOK] DUPLICATE MESSAGE BLOCKED (ATOMIC DB):', {
-          messageId: messageId.slice(0, 30),
-          from: `${from.slice(0, 6)}xxx`,
-          message: msgText.slice(0, 30),
-        });
-        return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked' }), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
+        // But it could be an OLD entry from a prior session, not a genuine webhook duplicate
+        // Check when the existing entry was created
+        const existing = await db.execute(sql`
+          SELECT id, processed_at FROM processed_webhooks
+          WHERE message_id = ${messageId}
+          LIMIT 1
+        `);
+
+        const existingRow = existing.rows?.[0];
+        if (existingRow) {
+          const createdAt = new Date(existingRow.processed_at).getTime();
+          const ageSeconds = (Date.now() - createdAt) / 1000;
+
+          if (ageSeconds > 120) {
+            // Old entry (> 2 min) — this is a NEW message with same text, not a webhook duplicate
+            // Delete old entry and re-insert to allow processing
+            console.info('[WEBHOOK] OLD ENTRY FOUND, RE-PROCESSING:', {
+              messageId: messageId.slice(0, 30),
+              ageSeconds: Math.round(ageSeconds),
+            });
+
+            await db.execute(sql`
+              DELETE FROM processed_webhooks WHERE message_id = ${messageId}
+            `);
+
+            await db.execute(sql`
+              INSERT INTO processed_webhooks (message_id, phone_number, message_preview)
+              VALUES (${messageId}, ${from}, ${msgText.slice(0, 100)})
+            `);
+          } else {
+            // Recent entry (< 2 min) — genuine webhook duplicate, block it
+            console.info('[WEBHOOK] DUPLICATE MESSAGE BLOCKED (ATOMIC DB):', {
+              messageId: messageId.slice(0, 30),
+              from: `${from.slice(0, 6)}xxx`,
+              message: msgText.slice(0, 30),
+              ageSeconds: Math.round(ageSeconds),
+            });
+            return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked' }), {
+              status: 200,
+              headers: { 'content-type': 'application/json' },
+            });
+          }
+        } else {
+          // Shouldn't happen, but just in case
+          console.warn('[WEBHOOK] Conflict but no existing row found, skipping:', messageId.slice(0, 30));
+          return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_unknown' }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' },
+          });
+        }
       }
 
       console.info('[WEBHOOK] Message marked as processing in database:', {

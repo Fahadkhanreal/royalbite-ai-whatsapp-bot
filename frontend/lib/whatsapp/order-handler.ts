@@ -18,22 +18,24 @@ export interface OrderDetails {
   specialInstructions?: string;
 }
 
+export interface ExtractedItem {
+  name: string;
+  quantity: number;
+}
+
 /**
  * Extract order details from user message
- * Looks for: quantity, item names, address
+ * Looks for: item names with per-item quantities, address
  * Uses fuzzy matching for menu items (handles typos automatically)
+ *
+ * Fix: "2 tikka 3 biryani" → [{name: "Chicken Tikka", qty: 2}, {name: "Sindhi Biryani", qty: 3}]
  */
 export async function extractOrderDetails(message: string, menuContext?: string): Promise<{
-  items: string[];
-  quantity: number | null;
+  items: ExtractedItem[];
   address: string | null;
   hasAllDetails: boolean;
 }> {
   const msgLower = message.toLowerCase();
-
-  // Extract quantity (look for numbers)
-  const quantityMatch = msgLower.match(/(\d+)\s*(plate|piece|pc|x|samosa|biryani|tikka|kebab)?/i);
-  const quantity = quantityMatch ? parseInt(quantityMatch[1]) : null;
 
   // Extract address - IMPROVED to capture more formats
   let address: string | null = null;
@@ -72,8 +74,8 @@ export async function extractOrderDetails(message: string, menuContext?: string)
     }
   }
 
-  // Extract item names using FUZZY MATCHING against actual menu
-  let items: string[] = [];
+  // STEP 1: Extract item names using fuzzy matching against DB menu
+  let rawItemNames: string[] = [];
 
   try {
     // Fetch available menu items from database
@@ -84,12 +86,12 @@ export async function extractOrderDetails(message: string, menuContext?: string)
     const menuItemNames = availableDishes.map(dish => dish.name);
 
     // Use fuzzy matching to extract items (handles typos automatically!)
-    items = fuzzyExtractItems(message, menuItemNames, 0.70);
+    rawItemNames = fuzzyExtractItems(message, menuItemNames, 0.70);
 
     console.info('[ORDER-EXTRACT] Fuzzy match results:', {
       userInput: message.slice(0, 100),
       availableItems: menuItemNames.length,
-      matchedItems: items,
+      matchedItems: rawItemNames,
     });
   } catch (error) {
     console.error('[ORDER-EXTRACT] Fuzzy matching failed, using fallback:', error);
@@ -102,21 +104,12 @@ export async function extractOrderDetails(message: string, menuContext?: string)
 
     // Also check for common typos/variations
     const itemVariations: Record<string, string> = {
-      'tikky': 'tikka',
-      'tika': 'tikka',
-      'tikki': 'tikka',
-      'samosy': 'samosa',
-      'samosay': 'samosa',
-      'kabab': 'kebab',
-      'kebeb': 'kebab',
-      'karahee': 'karahi',
-      'karhai': 'karahi',
-      'briyani': 'biryani',
-      'biryany': 'biryani',
-      'biryan': 'biryani',
-      'bryani': 'biryani',
-      'nan': 'naan',
-      'lasi': 'lassi',
+      'tikky': 'tikka', 'tika': 'tikka', 'tikki': 'tikka',
+      'samosy': 'samosa', 'samosay': 'samosa',
+      'kabab': 'kebab', 'kebeb': 'kebab',
+      'karahee': 'karahi', 'karhai': 'karahi',
+      'briyani': 'biryani', 'biryany': 'biryani', 'biryan': 'biryani', 'bryani': 'biryani',
+      'nan': 'naan', 'lasi': 'lassi',
     };
 
     // First normalize the message with variations
@@ -128,19 +121,48 @@ export async function extractOrderDetails(message: string, menuContext?: string)
     // Now extract ALL matching items (not just first one)
     for (const keyword of itemKeywords) {
       if (normalizedMsg.includes(keyword)) {
-        // Avoid duplicates
-        if (!items.includes(keyword)) {
-          items.push(keyword);
+        if (!rawItemNames.includes(keyword)) {
+          rawItemNames.push(keyword);
         }
       }
     }
   }
 
-  const hasAllDetails = items.length > 0 && quantity !== null && address !== null;
+  // STEP 2: Assign per-item quantities
+  // "2 tikka 3 biryani" → tikka gets 2, biryani gets 3
+  const items: ExtractedItem[] = rawItemNames.map(name => {
+    const nameLower = name.toLowerCase();
+    // Find the number IMMEDIATELY before this item name
+    // Patterns: "2 tikka", "2tikka", "1plate biryani", "3piece chicken"
+    const regex = new RegExp(`(\\d+)\\s*(plate|piece|pc|x)?\\s*${nameLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+    const match = msgLower.match(regex);
+    const qty = match ? parseInt(match[1], 10) : 1;
+    return { name, quantity: qty };
+  });
+
+  // Fallback: if we have items but all quantities are 1, look for a solo number as default
+  if (items.length > 0 && items.every(i => i.quantity === 1)) {
+    // Find the first number NOT adjacent to any item name
+    const allNumbers = [...msgLower.matchAll(/(\d+)/g)];
+    for (const numMatch of allNumbers) {
+      const num = parseInt(numMatch[1], 10);
+      const before = msgLower.slice(0, numMatch.index!).toLowerCase();
+      const after = msgLower.slice(numMatch.index! + numMatch[0].length).toLowerCase();
+      const isAdjacentToItem = rawItemNames.some(name =>
+        after.startsWith(name.toLowerCase()) || before.endsWith(name.toLowerCase())
+      );
+      if (!isAdjacentToItem && num >= 1 && num <= 50) {
+        // This standalone number applies to ALL items equally
+        items.forEach(i => { i.quantity = num; });
+        break;
+      }
+    }
+  }
+
+  const hasAllDetails = items.length > 0 && address !== null;
 
   return {
     items,
-    quantity,
     address,
     hasAllDetails,
   };

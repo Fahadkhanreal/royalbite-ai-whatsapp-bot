@@ -115,8 +115,10 @@ export async function generateReply(
     // CRITICAL: Allow user to escape order flow if they change topic
     // If user asks for menu, greeting, help, etc. while in order state, clear it
     if (conversationState?.state === 'awaiting_order_details') {
-      // Check if user is EXPLICITLY asking for help/menu (not just mentioning items)
-      const escapingKeywords = ['menu', 'help', 'timings', 'cancel', 'kya hai', 'batao', 'dekhao'];
+      // Check if user is EXPLICITLY asking for help/menu/greeting (not just mentioning items)
+      const escapingKeywords = ['menu', 'help', 'timings', 'cancel', 'kya hai', 'batao', 'dekhao',
+                                'hi', 'hello', 'hey', 'salam', 'assalamo', 'good morning', 'good evening',
+                                'thanks', 'thank you', 'shukria', 'thankyou'];
       const isEscaping = escapingKeywords.some(keyword => userMessage.toLowerCase().includes(keyword)) &&
                         !userMessage.toLowerCase().match(/\d+\s*(tikka|samosa|biryani|kebab|karahi)/i);
 
@@ -134,28 +136,26 @@ export async function generateReply(
         if (extracted.hasAllDetails) {
           // All details present, create order
           try {
-            // Handle multiple items
+            // Build order items with per-item quantities from extractOrderDetails
+            // Fix: "2 tikka 3 biryani" now correctly gives tikka qty=2, biryani qty=3
             const orderItems: Array<{ name: string; quantity: number; price: number }> = [];
             let totalPrice = 0;
 
-            const defaultQuantity = extracted.items.length > 1 ? 1 : (extracted.quantity || 1);
-
-            for (const itemName of extracted.items) {
+            for (const extItem of extracted.items) {
               // Fetch item price (check admin menu first, then documents)
               const dishMatch = await db.query.dishes.findFirst({
                 where: (dishes, { and, eq, ilike }) =>
                   and(
-                    ilike(dishes.name, `%${itemName}%`),
+                    ilike(dishes.name, `%${extItem.name}%`),
                     eq(dishes.isAvailable, true)
                   ),
               });
 
               const price = dishMatch ? parseFloat(dishMatch.price) : 250;
-              const displayName = dishMatch ? dishMatch.name : itemName;
-              const quantity = defaultQuantity;
+              const displayName = dishMatch ? dishMatch.name : extItem.name;
 
-              orderItems.push({ name: displayName, quantity, price });
-              totalPrice += price * quantity;
+              orderItems.push({ name: displayName, quantity: extItem.quantity, price });
+              totalPrice += price * extItem.quantity;
             }
 
             // Create order
@@ -184,16 +184,13 @@ export async function generateReply(
           // Missing details, ask for them
           const missing: string[] = [];
           if (extracted.items.length === 0) missing.push('item name');
-          if (!extracted.quantity) missing.push('quantity');
           if (!extracted.address) missing.push('address');
 
         return `Thoda aur detail chahiye 😊\n\nPlease bataiye:\n${
-          missing.includes('item name') ? '- Kya order karna hai?\n' : ''
+          missing.includes('item name') ? '- Kya order karna hai? (item name)\n' : ''
         }${
-          missing.includes('quantity') ? '- Kitne plate/piece?\n' : ''
-        }${
-          missing.includes('address') ? '- Delivery address?\n' : ''
-        }\nExample: "2 chicken biryani, House 123 Block 5 Gulshan"`;
+          missing.includes('address') ? '- Aapka delivery address?\n' : ''
+        }\n- Kitne plate/piece?\n\nExample: "2 tikka 3 biryani, House 123 Block 5 Gulshan"`;
         }
       }
     }
@@ -264,29 +261,25 @@ export async function generateReply(
       if (extracted.hasAllDetails) {
         // User provided everything in one message - process immediately
         try {
-          // Handle multiple items if present
+          // Build order items with per-item quantities from extractOrderDetails
           const orderItems: Array<{ name: string; quantity: number; price: number }> = [];
           let totalPrice = 0;
 
-          // If multiple items, use quantity 1 for each; if single item, use extracted quantity
-          const defaultQuantity = extracted.items.length > 1 ? 1 : (extracted.quantity || 1);
-
-          for (const itemName of extracted.items) {
+          for (const extItem of extracted.items) {
             // Try to find matching dish
             const dishMatch = await db.query.dishes.findFirst({
               where: (dishes, { and, eq, ilike }) =>
                 and(
-                  ilike(dishes.name, `%${itemName}%`),
+                  ilike(dishes.name, `%${extItem.name}%`),
                   eq(dishes.isAvailable, true)
                 ),
             });
 
-            const price = dishMatch ? parseFloat(dishMatch.price) : 250; // Default fallback
-            const displayName = dishMatch ? dishMatch.name : itemName;
-            const quantity = defaultQuantity;
+            const price = dishMatch ? parseFloat(dishMatch.price) : 250;
+            const displayName = dishMatch ? dishMatch.name : extItem.name;
 
-            orderItems.push({ name: displayName, quantity, price });
-            totalPrice += price * quantity;
+            orderItems.push({ name: displayName, quantity: extItem.quantity, price });
+            totalPrice += price * extItem.quantity;
           }
 
           // Create order with all items
@@ -308,11 +301,9 @@ export async function generateReply(
         }
       } else {
         // Missing details - enter conversation state and ask
-        setConversationState(conversationUserId, 'awaiting_order_details', {
-          orderedItem: extracted.items[0] || null,
-        });
+        setConversationState(conversationUserId, 'awaiting_order_details', {});
 
-        return `Bilkul! Order le raha hoon 😊\n\nPlease yeh details de dijiye:\n- Kya order karna hai? (item name)\n- Kitne plate/piece?\n- Aapka delivery address?\n\nExample: "2 chicken biryani, House 123 Block 5 Gulshan"`;
+        return `Bilkul order le raha hoon! 😊\n\nMujhe yeh details de dijiye:\n• Kya order karna hai? (item name)\n• Kitne plate/piece?\n• Aapka delivery address?\n\nExample: "2 tikka 3 biryani, House 123 Block 5 Gulshan"`;
       }
     }
 
