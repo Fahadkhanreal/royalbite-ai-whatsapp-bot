@@ -124,23 +124,23 @@ export async function generateReply(
     // CRITICAL: Allow user to escape order flow if they change topic
     // If user asks for menu, greeting, help, etc. while in order state, clear it
     if (conversationState?.state === 'awaiting_order_details') {
-      // CRITICAL: If message contains greeting keywords + numbers, user is BOTH greeting AND ordering
-      // In this case, extract order details and create order (don't escape)
       const msgLower = userMessage.toLowerCase();
       const hasGreeting = ['hi', 'hello', 'hey', 'salam', 'assalamo'].some(k => msgLower.includes(k));
       const hasItemsWithNumbers = msgLower.match(/\d+\s*(tikka|samosa|biryani|kebab|karahi)/i);
 
-      // If message has greeting keywords but NO actual order items → user wants to escape order flow
+      // Case 1: Greeting only, no items → escape order flow, go to greeting handler
       if (hasGreeting && !hasItemsWithNumbers) {
         console.info('[RESPOND] User escaped order flow with greeting (no items):', intent.action);
         clearConversationState(conversationUserId);
         // Continue to normal greeting handler below
-      } else if (hasGreeting && hasItemsWithNumbers) {
-        // User mixed greeting + order items → process order, don't escape
+      }
+      // Case 2: Greeting + items → process order (mixed message)
+      else if (hasGreeting && hasItemsWithNumbers) {
         console.info('[RESPOND] Mixed greeting+order, processing order');
-        // Fall through to order processing below
-      } else {
-        // Check if user is EXPLICITLY asking for help/menu (not just mentioning items)
+        // Continue to order processing below (not escaped)
+      }
+      // Case 3: Check if escaping intent (menu/help/timings etc.)
+      else {
         const escapingKeywords = ['menu', 'help', 'timings', 'cancel', 'kya hai', 'batao', 'dekhao',
                                   'hi', 'hello', 'hey', 'salam', 'assalamo', 'good morning', 'good evening',
                                   'thanks', 'thank you', 'shukria', 'thankyou'];
@@ -150,70 +150,51 @@ export async function generateReply(
         if (isEscaping && ['menu_query', 'greeting', 'help', 'timing', 'thanks'].includes(intent.action)) {
           console.info('[RESPOND] User escaped order flow with intent:', intent.action);
           clearConversationState(conversationUserId);
+          // Continue to normal handler below
         } else {
-        // User is still in order flow - process order details
-        // IGNORE intent detection here - treat everything as order details
-        console.info('[RESPOND] Processing order details (ignoring intent detection)');
-        const extracted = await extractOrderDetails(userMessage);
+          // User is still in order flow - process order details
+          console.info('[RESPOND] Processing order details (ignoring intent detection)');
+          const extracted = await extractOrderDetails(userMessage);
 
-        if (extracted.hasAllDetails) {
-          // All details present, create order
-          try {
-            // Build order items with per-item quantities from extractOrderDetails
-            // Fix: "2 tikka 3 biryani" now correctly gives tikka qty=2, biryani qty=3
-            const orderItems: Array<{ name: string; quantity: number; price: number }> = [];
-            let totalPrice = 0;
+          if (extracted.hasAllDetails) {
+            try {
+              const orderItems: Array<{ name: string; quantity: number; price: number }> = [];
+              let totalPrice = 0;
 
-            for (const extItem of extracted.items) {
-              // Fetch item price (check admin menu first, then documents)
-              const dishMatch = await db.query.dishes.findFirst({
-                where: (dishes, { and, eq, ilike }) =>
-                  and(
-                    ilike(dishes.name, `%${extItem.name}%`),
-                    eq(dishes.isAvailable, true)
-                  ),
+              for (const extItem of extracted.items) {
+                const dishMatch = await db.query.dishes.findFirst({
+                  where: (dishes, { and, eq, ilike }) =>
+                    and(
+                      ilike(dishes.name, '%' + extItem.name + '%'),
+                      eq(dishes.isAvailable, true)
+                    ),
+                });
+
+                const price = dishMatch ? parseFloat(dishMatch.price) : 250;
+                const displayName = dishMatch ? dishMatch.name : extItem.name;
+                orderItems.push({ name: displayName, quantity: extItem.quantity, price });
+                totalPrice += price * extItem.quantity;
+              }
+
+              const orderResult = await createOrder({
+                items: orderItems,
+                address: extracted.address,
+                phoneNumber: conversationUserId,
               });
 
-              const price = dishMatch ? parseFloat(dishMatch.price) : 250;
-              const displayName = dishMatch ? dishMatch.name : extItem.name;
-
-              orderItems.push({ name: displayName, quantity: extItem.quantity, price });
-              totalPrice += price * extItem.quantity;
+              clearConversationState(conversationUserId);
+              return formatOrderConfirmation(orderResult.orderNumber, orderItems, orderResult.total, extracted.address);
+            } catch (error) {
+              console.error('Order creation failed:', error);
+              clearConversationState(conversationUserId);
+              return 'Sorry, order create karte waqt issue aa gaya. Please try again ya call karein!';
             }
-
-            // Create order
-            const orderResult = await createOrder({
-              items: orderItems,
-              address: extracted.address!,
-              phoneNumber: conversationUserId,
-            });
-
-            // Clear conversation state
-            clearConversationState(conversationUserId);
-
-            // Return confirmation
-            return formatOrderConfirmation(
-              orderResult.orderNumber,
-              orderItems,
-              orderResult.total,
-              extracted.address!
-            );
-          } catch (error) {
-            console.error('Order creation failed:', error);
-            clearConversationState(conversationUserId);
-            return `Sorry, order create karte waqt issue aa gaya. Please try again ya call karein!`;
+          } else {
+            const missing = [];
+            if (extracted.items.length === 0) missing.push('Kya order karna hai? (item name)');
+            if (!extracted.address) missing.push('Aapka delivery address?');
+            return 'Thoda aur detail chahiye \u{1F60A}\n\nPlease bataiye:\n- ' + missing.join('\n- ') + '\n- Kitne plate/piece?\n\nExample: "2 tikka 3 biryani, House 123 Block 5 Gulshan"';
           }
-        } else {
-          // Missing details, ask for them
-          const missing: string[] = [];
-          if (extracted.items.length === 0) missing.push('item name');
-          if (!extracted.address) missing.push('address');
-
-        return `Thoda aur detail chahiye 😊\n\nPlease bataiye:\n${
-          missing.includes('item name') ? '- Kya order karna hai? (item name)\n' : ''
-        }${
-          missing.includes('address') ? '- Aapka delivery address?\n' : ''
-        }\n- Kitne plate/piece?\n\nExample: "2 tikka 3 biryani, House 123 Block 5 Gulshan"`;
         }
       }
     }
