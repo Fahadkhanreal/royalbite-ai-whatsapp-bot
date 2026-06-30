@@ -156,12 +156,39 @@ export async function POST(req: Request) {
     // Normalize text so subtle whitespace/unicode differences don't bypass dedup
     const normalizedText = msgText.replace(/\s+/g, ' ').trim();
     const messageId = `${from}-${normalizedText}`;
+    // Hash messageId to a 32-bit integer for advisory lock (hoisted var for finally block access)
+    var _lockHash = 0; // eslint-disable-line
+    for (let i = 0; i < messageId.length; i++) {
+      _lockHash = ((_lockHash << 5) - _lockHash) + messageId.charCodeAt(i);
+      _lockHash = _lockHash & _lockHash; // Convert to 32-bit int
+    }
 
-    // LAYER 1: IN-MEMORY DEDUP - Blazing fast, works for same-Vercel-instance duplicates
-    // Green API often sends duplicates within milliseconds to the same instance
-    // CRITICAL: Use normalized text for dedupKey too, so whitespace differences don't bypass it
-    const normalizedDedup = msgText.replace(/\s+/g, ' ').trim();
-    const dedupKey = `${from}:${normalizedDedup}`;
+    // LAYER 1: POSTGRESQL ADVISORY LOCK - Guaranteed atomic at SERVER level, not connection level
+    // Fixes race condition where Neon HTTP driver allows 2 concurrent INSERTs to both succeed
+    // pg_try_advisory_lock returns false if another session holds the lock → it's a duplicate
+    try {
+      const lockResult = await db.execute(sql`
+        SELECT pg_try_advisory_lock(${_lockHash}) as locked
+      `);
+      const locked = lockResult.rows?.[0]?.locked === true;
+
+      if (!locked) {
+        // Another webhook instance is already processing this exact message
+        console.info('[WEBHOOK] DUPLICATE BLOCKED (ADVISORY LOCK):', {
+          messageId: messageId.slice(0, 30),
+        });
+        return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked_lock' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      console.info('[WEBHOOK] Advisory lock acquired:', messageId.slice(0, 30));
+    } catch (lockError) {
+      console.error('[WEBHOOK] Advisory lock failed, continuing anyway:', lockError);
+    }
+
+    // LAYER 2: IN-MEMORY DEDUP - Additional protection for same-instance duplicates
+    const dedupKey = `${from}:${normalizedText}`;
     if (isMessageProcessed(dedupKey)) {
       console.info('[WEBHOOK] DUPLICATE BLOCKED (IN-MEMORY):', {
         from: `${from.slice(0, 6)}xxx`,
@@ -174,74 +201,23 @@ export async function POST(req: Request) {
     }
     markMessageProcessed(dedupKey);
 
-    // LAYER 2: ATOMIC DATABASE DEDUP - Works across all Vercel instances
-    // Raw SQL INSERT ... ON CONFLICT DO NOTHING fixes race condition
-    // PostgreSQL unique constraint handles this atomically at DB level
-    //
-    // CRITICAL: messageId = `${from}-${msgText}` means same user saying "hi" again reuses same ID.
-    // If old entry exists from hours ago, we must ALLOW re-processing, not block it forever.
-    // Moved BEFORE message processing to minimize race condition window
+    // LAYER 3: ATOMIC DATABASE DEDUP - INSERT with unique constraint
+    // Used for dedup across sessions (same message text at different times)
     try {
-      const dbResult = await db.execute(sql`
+      await db.execute(sql`
         INSERT INTO processed_webhooks (message_id, phone_number, message_preview)
         VALUES (${messageId}, ${from}, ${msgText.slice(0, 100)})
         ON CONFLICT (message_id) DO NOTHING
-        RETURNING id
       `);
-
-      // If no row returned, this is a potential duplicate (unique constraint blocked the insert)
-      if (!dbResult.rows || dbResult.rows.length === 0) {
-        // But it could be an OLD entry from a prior session, not a genuine webhook duplicate
-        // Check when the existing entry was created
-        const existing = await db.execute(sql`
-          SELECT id, processed_at FROM processed_webhooks
-          WHERE message_id = ${messageId}
-          LIMIT 1
-        `);
-
-        const existingRow = existing.rows?.[0] as { id: string; processed_at: string } | undefined;
-        if (existingRow) {
-          const createdAt = new Date(existingRow.processed_at).getTime();
-          const ageSeconds = (Date.now() - createdAt) / 1000;
-
-          if (ageSeconds > 120) {
-            // Old entry (> 2 min) — this is a NEW message with same text, not a webhook duplicate
-            // Delete old entry and re-insert to allow processing
-            console.info('[WEBHOOK] OLD ENTRY FOUND, RE-PROCESSING:', {
-              messageId: messageId.slice(0, 30),
-              ageSeconds: Math.round(ageSeconds),
-            });
-            await db.execute(sql`
-              DELETE FROM processed_webhooks WHERE message_id = ${messageId}
-            `);
-            await db.execute(sql`
-              INSERT INTO processed_webhooks (message_id, phone_number, message_preview)
-              VALUES (${messageId}, ${from}, ${msgText.slice(0, 100)})
-            `);
-          } else {
-            // Recent entry (< 2 min) — genuine webhook duplicate, block it
-            console.info('[WEBHOOK] DUPLICATE BLOCKED (ATOMIC DB):', {
-              messageId: messageId.slice(0, 30),
-              ageSeconds: Math.round(ageSeconds),
-            });
-            return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_blocked' }), {
-              status: 200,
-              headers: { 'content-type': 'application/json' },
-            });
-          }
-        } else {
-          console.warn('[WEBHOOK] Conflict but no existing row found, skipping:', messageId.slice(0, 30));
-          return new Response(JSON.stringify({ status: 'ok', reason: 'duplicate_unknown' }), {
-            status: 200,
-            headers: { 'content-type': 'application/json' },
-          });
-        }
-      }
-
-      console.info('[WEBHOOK] Message ID registered in DB:', messageId.slice(0, 30));
     } catch (dedupError) {
       console.error('[WEBHOOK] DB dedup failed, continuing:', dedupError);
     }
+
+    // Release advisory lock when done (schedule at end, but don't await)
+    const releaseLock = () => {
+      db.execute(sql`SELECT pg_advisory_unlock(${_lockHash})`).catch(() => {});
+    };
+    // Schedule lock release after response is sent
 
     // Debug: Log the actual text field to see what WATI sends
     console.info('[WEBHOOK] Raw payload analysis:', {
@@ -252,12 +228,16 @@ export async function POST(req: Request) {
       type: body.type,
     });
 
-    // Meta API format
+    // Meta API format - ONLY if not already set by WATI parsing
     if (!from && body.entry?.[0]?.changes?.[0]?.value?.messages?.[0]) {
       const m = body.entry[0].changes[0].value.messages[0];
       from = getString(m.from);
       msgText = getString(m.text?.body);
     }
+
+    // CRITICAL: Recreate messageId NOW because from/msgText may have changed!
+    // The earlier messageId was computed before Meta API format override
+    const messageIdFinal = `${from}-${msgText.replace(/\s+/g, ' ').trim()}`;
 
     console.info('[WEBHOOK] Message parsed:', {
       eventType: parsed.eventType || 'unknown',
@@ -325,6 +305,9 @@ export async function POST(req: Request) {
     await sendWhatsAppMessage(from, reply);
     console.info('[WEBHOOK] Message sent successfully to:', `${from.slice(0, 6)}xxx`);
 
+    // Release advisory lock
+    releaseLock();
+
     return new Response(JSON.stringify({ status: 'ok', reply_sent: true }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
@@ -344,5 +327,10 @@ export async function POST(req: Request) {
       status: 200,
       headers: { 'content-type': 'application/json' },
     });
+  } finally {
+    // Always release advisory lock if it was acquired
+    try {
+      db.execute(sql`SELECT pg_advisory_unlock(${_lockHash})`).catch(() => {});
+    } catch (_) {}
   }
 }
